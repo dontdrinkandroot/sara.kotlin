@@ -1,0 +1,46 @@
+name: CI build
+
+on:
+    push:
+        branches: [ "**" ]
+    pull_request:
+        branches: [ "**" ]
+
+jobs:
+    build:
+        name: Build ${{ matrix.os }}
+        runs-on: ${{ matrix.os }}
+        strategy:
+            fail-fast: false
+            matrix:
+                os: [ ubuntu-latest, macos-latest ]
+
+        steps:
+            -   name: Checkout
+                uses: actions/checkout@v4
+
+            -   name: Set up JDK
+                uses: actions/setup-java@v4
+                with:
+                    distribution: temurin
+                    java-version: 21
+
+            -   name: Install native dependencies (Linux)
+                if: runner.os == 'Linux'
+                run: |
+                    sudo apt-get update
+                    sudo apt-get install -y --no-install-recommends libcurl4-openssl-dev zlib1g-dev
+
+            -   name: Build with Gradle (no wrapper)
+                uses: gradle/gradle-build-action@v3
+                with:
+                    gradle-version: 8.10.2
+                    arguments: linkReleaseExecutableNative --stacktrace
+
+            -   name: Upload binary artifact
+                uses: actions/upload-artifact@v4
+                with:
+                    name: sara-${{ runner.os }}-${{ runner.arch }}-release
+                    path: |
+                        build/bin/native/releaseExecutable/*
+                    if-no-files-found: error

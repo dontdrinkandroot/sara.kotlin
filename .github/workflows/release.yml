@@ -1,0 +1,87 @@
+name: Release
+
+on:
+    push:
+        tags:
+            - 'v*'
+
+permissions:
+    contents: write
+
+jobs:
+    build:
+        name: Build artifacts (${{ matrix.os }})
+        runs-on: ${{ matrix.os }}
+        strategy:
+            fail-fast: false
+            matrix:
+                os: [ ubuntu-latest, macos-latest ]
+
+        steps:
+            -   name: Checkout
+                uses: actions/checkout@v4
+
+            -   name: Set up JDK
+                uses: actions/setup-java@v4
+                with:
+                    distribution: temurin
+                    java-version: 21
+
+            -   name: Install native dependencies (Linux)
+                if: runner.os == 'Linux'
+                run: |
+                    sudo apt-get update
+                    sudo apt-get install -y --no-install-recommends libcurl4-openssl-dev zlib1g-dev
+
+            -   name: Build with Gradle (no wrapper)
+                uses: gradle/gradle-build-action@v3
+                with:
+                    gradle-version: 8.10.2
+                    arguments: linkReleaseExecutableNative --stacktrace
+
+            -   name: Rename and package binary
+                shell: bash
+                run: |
+                    mkdir -p dist
+                    BIN_DIR="build/bin/native/releaseExecutable"
+                    FILE=$(ls -1 "$BIN_DIR" | head -n1)
+                    SRC="$BIN_DIR/$FILE"
+                    OS="${{ runner.os }}"
+                    ARCH="${{ runner.arch }}"
+                    DEST="dist/sara-${OS}-${ARCH}"
+                    cp "$SRC" "$DEST"
+                    # ensure executable bit (esp. on macOS upload)
+                    chmod +x "$DEST" || true
+                    echo "Packaged $SRC -> $DEST"
+
+            -   name: Upload artifact
+                uses: actions/upload-artifact@v4
+                with:
+                    name: dist-${{ runner.os }}-${{ runner.arch }}
+                    path: dist/*
+                    if-no-files-found: error
+
+    release:
+        name: Create GitHub Release
+        runs-on: ubuntu-latest
+        needs: build
+        steps:
+            -   name: Download all artifacts
+                uses: actions/download-artifact@v4
+                with:
+                    pattern: dist-*
+                    merge-multiple: true
+                    path: dist
+
+            -   name: Show files
+                run: ls -al dist
+
+            -   name: Create Release and upload binaries
+                uses: softprops/action-gh-release@v2
+                with:
+                    files: |
+                        dist/*
+                    draft: false
+                    prerelease: false
+                env:
+                    GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
