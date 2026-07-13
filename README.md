@@ -4,7 +4,7 @@ A small, fast command-line assistant written in Kotlin/Native. It connects to an
 experience with optional tools and a configurable system prompt.
 
 - Runs as a single native executable (no JVM required)
-- Targets macOS (x64/arm64) and Linux (x64)
+- Targets Linux (x64)
 
 #### Download
 
@@ -12,7 +12,7 @@ Download prebuilt binaries from GitHub Releases:
 
 - https://github.com/dontdrinkandroot/sara.kotlin/releases
 
-Pick the asset for your platform, make it executable, and run it. Example (Linux/macOS):
+Pick the asset for your platform, make it executable, and run it. Example (Linux):
 
 ```
 curl -L -o sara https://github.com/dontdrinkandroot/sara.kotlin/releases/download/<version>/sara-<your-os-arch>

@@ -9,14 +9,11 @@ repositories {
 
 kotlin {
     val hostOs = System.getProperty("os.name")
-    val arch = System.getProperty("os.arch")
 
     // Select the correct Kotlin/Native target for CI runners and local builds
     val nativeTarget = when {
-        hostOs == "Mac OS X" && arch == "aarch64" -> macosArm64("native")
-        hostOs == "Mac OS X" -> macosX64("native")
         hostOs == "Linux" -> linuxX64("native")
-        else -> throw GradleException("Host OS '$hostOs' (arch: $arch) is not supported by Kotlin/Native.")
+        else -> throw GradleException("Host OS '$hostOs' is not supported. SARA only targets Linux.")
     }
 
     nativeTarget.apply {
