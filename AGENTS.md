@@ -25,9 +25,10 @@ apply: always
 ## Environment
 
 * The configuration is stored in `~/.config/sara/`
-    * There is a `.env` file in the directory that provides the `API_KEY` variable, that contains the bearer to interact
-      with the LLM Provider, a `MODEL` variable that specifies which model to use, and a required `BASE_URL` variable
-      that points to the OpenAI-compatible API base (without the trailing path).
+  * There is a `.env` file in the directory that provides the `SARA_API_KEY` variable (bearer to interact with the
+    LLM Provider), the `SARA_MODEL` variable (which model to use), and the required `SARA_BASE_URL` variable that
+    points to the OpenAI-compatible API base (without the trailing path). Optional: `SARA_SEARXNG_URL` and
+    `SARA_SEARXNG_TOKEN` for web search (see Web Search below).
     * There is an optional `system-prompt.md` file that contains a System Prompt which is prepended to each session.
 
 ## Build
@@ -46,18 +47,26 @@ apply: always
 We load configuration from the user config directory `~/.config/sara/`.
 
 - Primary config file: `~/.config/sara/.env`
+- Optional local overrides: `~/.config/sara/.env.local` (overrides `.env`)
 - Optional system prompt file: `~/.config/sara/system-prompt.md`
 
-Variables and precedence for model selection, API key, and API base URL:
+Variables and precedence (later overrides earlier):
 
-- Variables: `SARA_MODEL`, `SARA_API_KEY`, and `SARA_BASE_URL`.
-- Sources and precedence (later overrides earlier):
-    1) `.env` file values
-    2) Real environment variables `SARA_MODEL`, `SARA_API_KEY`, and `SARA_BASE_URL`
-    3) Command line options (CLI)
-- Failure behavior: If after applying precedence any of `SARA_MODEL`, `SARA_API_KEY`, or `SARA_BASE_URL` is undefined,
-  SARA fails fast
-  with a clear error message.
+1) `.env` file values
+2) `.env.local` file values
+3) Real environment variables
+4) Command line options (CLI) — currently only `--model`/`-m` overrides `SARA_MODEL`
+
+Required variables (fail fast with a clear error if any is undefined after applying precedence):
+
+- `SARA_MODEL`, `SARA_API_KEY`, `SARA_BASE_URL`
+
+Optional variables:
+
+- `SARA_SEARXNG_URL` — base URL of a Searxng instance. When set, SARA registers a `web_search` tool that queries
+  `${SARA_SEARXNG_URL}/search?format=json`.
+- `SARA_SEARXNG_TOKEN` — optional bearer token sent as `Authorization: Bearer <token>` to the Searxng instance. Ignored
+  if `SARA_SEARXNG_URL` is not set.
 
 Provider base URL examples for `.env`:
 
@@ -76,6 +85,10 @@ SARA_API_KEY=sk-or-...
 # SARA_BASE_URL=https://api.mammouth.ai/v1
 # SARA_MODEL=meta-llama/llama-3.1-70b-instruct
 # SARA_API_KEY=mm-...
+
+# Searxng (optional web search)
+# SARA_SEARXNG_URL=http://localhost:8080
+# SARA_SEARXNG_TOKEN=optional-bearer-token
 ```
 
 System prompt handling:
@@ -109,11 +122,6 @@ skipped gracefully.
 - Session ends when the user submits an empty line or EOF (Ctrl+D) is encountered.
 - Verbose mode (-v/--verbose) prints a short REPL start hint.
 
-### Web Search
-
-Run with `-s` or `--search` to enable web search for the model. This is an OpenRouter-specific feature and will be
-ignored by providers that do not support it.
-
 ### Verbose Debug Logging
 
 Run with `-v` or `--verbose` to enable debug output (e.g., config summary, system prompt length, and detailed tool call
@@ -135,3 +143,27 @@ information).
 - By default SARA asks for explicit user confirmation before executing any command and returns combined stdout/stderr as
   the tool result. During that the spinner is paused.
 - Run with `-b` or `--brave-mode` to skip the confirmation prompts and execute tools automatically.
+- Tool executors implement `suspend fun execute(...)`, so tools may perform suspending I/O (e.g., HTTP). The tool-call
+  dispatch loop in `Sara.kt` is suspending and awaits each tool before appending the `role = "tool"` result message.
+
+### Web Search (Searxng)
+
+When `SARA_SEARXNG_URL` is set, SARA registers a `web_search` tool backed by the configured Searxng instance. The tool
+calls `${SARA_SEARXNG_URL}/search?format=json&q=<query>` and returns all results from a single request page, formatted
+as `Title`/`URL`/`Snippet` blocks. An optional bearer token can be supplied via `SARA_SEARXNG_TOKEN`. The previous
+OpenRouter `web` plugin path has been removed.
+
+## Self-Update Instruction
+
+This guidelines file is a living document and MUST be actively maintained by the LLM Agent.
+
+* **Trigger:** Whenever significant changes are made to the tech stack, project structure, coding guidelines, or key
+  features, the LLM Agent MUST immediately update this file (`AGENTS.md`) to reflect the current state of the project.
+* **Content:**
+  * Add any information that could have helped the agent to solve the task more efficiently or in fewer steps.
+  * Remove outdated, obsolete, or incorrect information.
+  * Ensure all tech stack versions and library names are accurate.
+  * Make sure the most important features are clearly documented.
+  * Keep the project structure up to date so that the most important files and directories are visible at a glance.
+* **Proactivity:** Do not wait for explicit instructions to update these guidelines if you identify a discrepancy
+  between the guidelines and the actual codebase.

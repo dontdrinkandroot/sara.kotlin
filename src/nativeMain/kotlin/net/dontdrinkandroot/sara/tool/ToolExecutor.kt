@@ -19,5 +19,5 @@ interface ToolExecutor {
      * @param verbose Whether to enable verbose logging
      * @return The result of the tool execution
      */
-    fun execute(arguments: JsonObject, verbose: Boolean): ToolResult
+    suspend fun execute(arguments: JsonObject, verbose: Boolean): ToolResult
 }

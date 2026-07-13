@@ -46,7 +46,7 @@ class WriteFileTool : ToolExecutor {
         )
     }
 
-    override fun execute(arguments: JsonObject, verbose: Boolean): ToolResult {
+    override suspend fun execute(arguments: JsonObject, verbose: Boolean): ToolResult {
         val path = arguments["path"]?.jsonPrimitive?.content
             ?: return ToolResult.Error("Missing required parameter: path")
         val content = arguments["content"]?.jsonPrimitive?.content

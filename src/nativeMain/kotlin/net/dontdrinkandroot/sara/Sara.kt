@@ -93,7 +93,7 @@ class Sara(
     private suspend fun fetchLlmResponse(messages: List<Message>): ChatCompletionResponse {
         val progress = progressBarLayout {
             spinner(Spinner.Dots())
-            text { "Processing${if (configuration.webSearchEnabled) " (with search)" else ""}" }
+            text { "Processing" }
         }.animateInCoroutine(terminal, total = 1)
 
         val response = coroutineScope {
@@ -102,7 +102,6 @@ class Sara(
                 llmClient.chatCompletion(
                     configuration.model,
                     messages = messages,
-                    enableWebSearch = configuration.webSearchEnabled,
                     tools = toolRegistry.getToolSchemas(),
                 ).also {
                     progress.update { completed = 1 }
@@ -142,7 +141,7 @@ class Sara(
     private fun Message.hasToolCalls(): Boolean =
         toolCalls != null && toolCalls.isNotEmpty()
 
-    private fun processToolCalls(message: Message, messages: MutableList<Message>) {
+    private suspend fun processToolCalls(message: Message, messages: MutableList<Message>) {
         logger.debug("Model requested ${message.toolCalls!!.size} tool call(s)")
         messages.add(message)
 
@@ -151,7 +150,7 @@ class Sara(
         }
     }
 
-    private fun executeToolCall(toolCall: ToolCall, messages: MutableList<Message>) {
+    private suspend fun executeToolCall(toolCall: ToolCall, messages: MutableList<Message>) {
         val toolName = toolCall.function.name
         val toolArgs = toolCall.function.arguments
 
@@ -184,7 +183,7 @@ class Sara(
         return askForToolPermission(toolName, toolArgs)
     }
 
-    private fun executeToolWithErrorHandling(tool: ToolExecutor, toolArgs: String): ToolResult {
+    private suspend fun executeToolWithErrorHandling(tool: ToolExecutor, toolArgs: String): ToolResult {
         return try {
             val argsJson = kotlinx.serialization.json.Json.parseToJsonElement(toolArgs)
                     as? kotlinx.serialization.json.JsonObject

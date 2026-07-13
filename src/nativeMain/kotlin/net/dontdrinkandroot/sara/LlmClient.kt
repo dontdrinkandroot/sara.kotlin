@@ -22,10 +22,6 @@ import kotlinx.serialization.json.*
 
 /**
  * OpenAI-compatible client for chat completions.
- *
- * Notes on provider-specific features:
- * - Parameters `plugins`, `enableWebSearch`, `webSearchEngine`, and `webSearchMaxResults` are specific to OpenRouter
- *   and may be ignored by other providers.
  */
 class LlmClient(
     private val baseUrl: String,
@@ -46,15 +42,8 @@ class LlmClient(
     /**
      * Sends a chat completion request to the configured OpenAI-compatible API.
      *
-     * Provider-specific notes:
-     * - `enableWebSearch`, `webSearchEngine`, `webSearchMaxResults` map to OpenRouter's web search plugin.
-     *   Other providers will likely ignore these parameters.
-     *
      * @param model The model to use (e.g., "openai/gpt-4o")
      * @param messages The conversation messages
-     * @param enableWebSearch If true, enables web search via the web plugin (OpenRouter-specific)
-     * @param webSearchEngine Optional: "native", "exa", or null for default behavior (OpenRouter-specific)
-     * @param webSearchMaxResults Maximum number of web search results (OpenRouter-specific)
      * @param maxTokens Maximum tokens to generate
      * @param temperature Sampling temperature (0-2)
      * @param topP Nucleus sampling parameter
@@ -67,9 +56,6 @@ class LlmClient(
     suspend fun chatCompletion(
         model: String,
         messages: List<Message>,
-        enableWebSearch: Boolean = false,
-        webSearchEngine: String? = null,
-        webSearchMaxResults: Int? = null,
         maxTokens: Int? = null,
         temperature: Double? = null,
         topP: Double? = null,
@@ -78,18 +64,6 @@ class LlmClient(
         tools: List<Tool>? = null,
         toolChoice: ToolChoice? = null
     ): ChatCompletionResponse {
-        val plugins = if (enableWebSearch) {
-            listOf(
-                Plugin(
-                    id = "web",
-                    engine = webSearchEngine,
-                    maxResults = webSearchMaxResults
-                )
-            )
-        } else {
-            null
-        }
-
         val request = ChatCompletionRequest(
             model = model,
             messages = messages,
@@ -101,7 +75,6 @@ class LlmClient(
             presencePenalty = presencePenalty,
             tools = tools,
             toolChoice = toolChoice,
-            plugins = plugins
         )
 
         val response: HttpResponse = client.post("${baseUrl}/chat/completions") {
@@ -141,15 +114,6 @@ data class ChatCompletionRequest(
     @SerialName("presence_penalty") val presencePenalty: Double? = null,
     val tools: List<Tool>? = null,
     @SerialName("tool_choice") val toolChoice: ToolChoice? = null,
-    val plugins: List<Plugin>? = null
-)
-
-@Serializable
-data class Plugin(
-    val id: String,
-    val engine: String? = null,
-    @SerialName("max_results") val maxResults: Int? = null,
-    @SerialName("search_prompt") val searchPrompt: String? = null
 )
 
 @Serializable

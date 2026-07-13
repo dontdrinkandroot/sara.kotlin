@@ -33,7 +33,7 @@ class ExecCommandTool : ToolExecutor {
         )
     }
 
-    override fun execute(arguments: JsonObject, verbose: Boolean): ToolResult {
+    override suspend fun execute(arguments: JsonObject, verbose: Boolean): ToolResult {
         try {
             val command = arguments["command"]?.jsonPrimitive?.content
                 ?: return ToolResult.Error("Missing required parameter: command")

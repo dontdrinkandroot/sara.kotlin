@@ -10,10 +10,7 @@ import net.dontdrinkandroot.sara.systemprompt.ChainedSystemPromptProvider
 import net.dontdrinkandroot.sara.systemprompt.SaraSystemPromptProvider
 import net.dontdrinkandroot.sara.systemprompt.StaticSystemPromptProvider
 import net.dontdrinkandroot.sara.systemprompt.SystemInformationSystemPromptProvider
-import net.dontdrinkandroot.sara.tool.ExecCommandTool
-import net.dontdrinkandroot.sara.tool.ReadFileTool
-import net.dontdrinkandroot.sara.tool.ToolRegistry
-import net.dontdrinkandroot.sara.tool.WriteFileTool
+import net.dontdrinkandroot.sara.tool.*
 import kotlin.system.exitProcess
 
 fun main(args: Array<String>) {
@@ -29,7 +26,7 @@ fun main(args: Array<String>) {
     val logger = ConsoleLogger(terminal, if (configuration.verbose) LogLevel.DEBUG else LogLevel.INFO)
 
     logger.debug("Config loaded")
-    logger.debug("searchEnabled=${configuration.webSearchEnabled}, verbose=${configuration.verbose}, braveMode=${configuration.braveMode}")
+    logger.debug("searxngUrl=${configuration.searxngUrl}, verbose=${configuration.verbose}, braveMode=${configuration.braveMode}")
     logger.debug("model=${configuration.model}")
     logger.debug("systemPromptLength=${configuration.systemPrompt?.length}")
 
@@ -37,6 +34,12 @@ fun main(args: Array<String>) {
     toolRegistry.register(ExecCommandTool())
     toolRegistry.register(ReadFileTool())
     toolRegistry.register(WriteFileTool())
+
+    val searxngClient = configuration.searxngUrl?.let { url ->
+        SearxngClient(url, configuration.searxngToken).also {
+            toolRegistry.register(WebSearchTool(it))
+        }
+    }
 
     val llmClient = LlmClient(
         baseUrl = configuration.baseUrl,
@@ -67,6 +70,7 @@ fun main(args: Array<String>) {
         }
     } finally {
         llmClient.close()
+        searxngClient?.close()
     }
 }
 

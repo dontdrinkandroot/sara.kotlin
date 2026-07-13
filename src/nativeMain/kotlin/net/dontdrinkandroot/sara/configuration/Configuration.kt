@@ -23,10 +23,11 @@ sealed class ConfigurationError(message: String) : Exception(message) {
 }
 
 data class Configuration(
-    val webSearchEnabled: Boolean = false,
     val model: String,
     val apiKey: String,
     val baseUrl: String,
+    val searxngUrl: String? = null,
+    val searxngToken: String? = null,
     val verbose: Boolean = false,
     val systemPrompt: String?,
     val braveMode: Boolean = false,
@@ -40,7 +41,6 @@ fun loadConfiguration(args: Array<String>): Configuration =
         buildConfiguration(
             configDir = determineConfigDirectory(),
             cliModel = cliArgs.model,
-            webSearchEnabled = cliArgs.webSearchEnabled,
             verbose = cliArgs.verbose,
             systemPromptFile = cliArgs.systemPromptFile,
             braveMode = cliArgs.braveMode,
@@ -49,7 +49,6 @@ fun loadConfiguration(args: Array<String>): Configuration =
 
 private data class CliArguments(
     val model: String?,
-    val webSearchEnabled: Boolean,
     val verbose: Boolean,
     val systemPromptFile: String?,
     val braveMode: Boolean,
@@ -64,13 +63,6 @@ private fun parseCliArguments(args: Array<String>): CliArguments {
         shortName = "m",
         description = "Model to use (overrides env and .env)"
     )
-
-    val cliWebSearchEnabled by parser.option(
-        ArgType.Boolean,
-        fullName = "websearch",
-        shortName = "s",
-        description = "Enable web search"
-    ).default(false)
 
     val cliVerbose by parser.option(
         ArgType.Boolean,
@@ -96,7 +88,6 @@ private fun parseCliArguments(args: Array<String>): CliArguments {
 
     return CliArguments(
         model = cliModel,
-        webSearchEnabled = cliWebSearchEnabled,
         verbose = cliVerbose,
         systemPromptFile = cliSystemPromptFile,
         braveMode = cliBraveMode
@@ -106,7 +97,6 @@ private fun parseCliArguments(args: Array<String>): CliArguments {
 private fun buildConfiguration(
     configDir: Path,
     cliModel: String?,
-    webSearchEnabled: Boolean,
     verbose: Boolean,
     systemPromptFile: String?,
     braveMode: Boolean,
@@ -131,6 +121,9 @@ private fun buildConfiguration(
         throw ConfigurationError.Multiple(errors)
     }
 
+    val searxngUrl = env["SARA_SEARXNG_URL"]?.takeIf(String::isNotBlank)
+    val searxngToken = env["SARA_SEARXNG_TOKEN"]?.takeIf(String::isNotBlank)
+
     val systemPromptPath: Path = when (val cliPath = systemPromptFile) {
         null -> configDir.appendFileName("system-prompt.md")
         else -> Path(expandHome(cliPath))
@@ -138,10 +131,11 @@ private fun buildConfiguration(
     val systemPrompt = loadSystemPrompt(systemPromptPath)
 
     return Configuration(
-        webSearchEnabled = webSearchEnabled,
         model = requireNotNull(model),
         apiKey = requireNotNull(apiKey),
         baseUrl = requireNotNull(baseUrl),
+        searxngUrl = searxngUrl,
+        searxngToken = searxngToken,
         verbose = verbose,
         systemPrompt = systemPrompt,
         braveMode = braveMode,
