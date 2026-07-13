@@ -6,8 +6,9 @@ apply: always
 
 * This is the codebase of SARA (System Action & Response Agent), an LLM Agent Interface for the CLI that helps the user
   use their Linux/Unix operating system.
-* It is written in Kotlin/Native 2.2.0
-* It uses ktor 3.3.1 to handle the API requests against an OpenAI compatible API
+* It is written in Kotlin/Native 2.4.0
+* It uses ktor 3.5.1 to handle the API requests against an OpenAI compatible API
+* It uses ksoup 0.2.6 (fleeksoft) for HTML parsing in the `web_fetch` tool
 * It uses mordant 3.0.2 for styling the output and formatting the Markdown output
 
 ## Coding Rules
@@ -138,8 +139,12 @@ information).
 
 ### Tool Calling Support
 
-- The assistant can request tools; SARA exposes an `exec_command` tool to run local commands.
-- Arguments: `command` (string) and optional `args` (string array).
+- The assistant can request tools; SARA exposes the following tools:
+  - `exec_command` — run a local shell command (combined stdout/stderr).
+  - `read_file` — read a file by path.
+  - `write_file` — write content to a file by path.
+  - `web_fetch` — fetch a web page and return its content as Markdown, text, or HTML (always registered).
+  - `web_search` — search the web via Searxng (only registered when `SARA_SEARXNG_URL` is set).
 - By default SARA asks for explicit user confirmation before executing any command and returns combined stdout/stderr as
   the tool result. During that the spinner is paused.
 - Run with `-b` or `--brave-mode` to skip the confirmation prompts and execute tools automatically.
@@ -152,6 +157,29 @@ When `SARA_SEARXNG_URL` is set, SARA registers a `web_search` tool backed by the
 calls `${SARA_SEARXNG_URL}/search?format=json&q=<query>` and returns all results from a single request page, formatted
 as `Title`/`URL`/`Snippet` blocks. An optional bearer token can be supplied via `SARA_SEARXNG_TOKEN`. The previous
 OpenRouter `web` plugin path has been removed.
+
+### Web Fetch
+
+SARA always registers a `web_fetch` tool (no configuration required). It fetches the content of a web page via HTTP
+and returns it to the LLM in a specified format. The tool uses a realistic browser User-Agent to avoid being blocked
+by common sites.
+
+Arguments:
+
+- `url` (string, required) — absolute URL to fetch.
+- `format` (string, optional, enum: `markdown` | `text` | `html`, default `markdown`) — output format.
+  - `markdown`: HTML is parsed with Ksoup, noise elements (script, style, nav, header, footer, aside, noscript, svg,
+    form, iframe) are stripped, and the remaining DOM is converted to Markdown preserving headings, links, lists, code
+    blocks, blockquotes, and tables. Relative links are resolved against the page URL.
+  - `text`: HTML is parsed and `body.text()` is returned as plain text.
+  - `html`: raw HTML body is returned as-is.
+- `max_length` (integer, optional, default 50000) — hard cap on returned characters to protect the context window.
+
+The returned content is prefixed with the URL and page title. If the content exceeds `max_length`, it is truncated
+with a `...[truncated]` marker.
+
+Implementation: `WebFetchClient` (ktor HTTP GET), `HtmlToMarkdown` (Ksoup DOM → Markdown converter, unit-testable
+without network), `WebFetchTool` (tool executor).
 
 ## Self-Update Instruction
 

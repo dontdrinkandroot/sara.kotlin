@@ -34,6 +34,8 @@ fun main(args: Array<String>) {
     toolRegistry.register(ExecCommandTool())
     toolRegistry.register(ReadFileTool())
     toolRegistry.register(WriteFileTool())
+    val webFetchClient = WebFetchClient()
+    toolRegistry.register(WebFetchTool(webFetchClient))
 
     val searxngClient = configuration.searxngUrl?.let { url ->
         SearxngClient(url, configuration.searxngToken).also {
@@ -70,6 +72,7 @@ fun main(args: Array<String>) {
         }
     } finally {
         llmClient.close()
+        webFetchClient.close()
         searxngClient?.close()
     }
 }
