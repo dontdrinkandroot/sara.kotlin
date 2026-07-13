@@ -117,6 +117,34 @@ If present, the user’s `system-prompt.md` is appended after these automatic se
 only the automatic sections are used. If any automatic section cannot be collected (e.g., command unavailable), it is
 skipped gracefully.
 
+The assembled system prompt is built by `ChainedSystemPromptProvider` in `Main.kt` from four providers in this order:
+
+1. `SaraSystemPromptProvider` — built-in persona ("You are Sara…").
+2. `SystemCustomizationsProvider` — System Customizations Log (see below).
+3. `StaticSystemPromptProvider(configuration.systemPrompt)` — the user’s `system-prompt.md` (skipped if absent/empty).
+4. `SystemInformationSystemPromptProvider` — General/Memory/RootFS/CPU/CurrentDirectory sections gathered via `cmd()`.
+
+The config directory resolver is the shared `defaultConfigDir()` helper in `configuration/Configuration.kt` (
+`$HOME/.config/sara`, `.` fallback).
+
+### System Customizations Log
+
+SARA proactively maintains `~/.config/sara/system-customizations.md` as a curated, refactorable state document
+describing how the system deviates from a default installation. It is **NOT** an append-only log: entries are added when
+a change is made and deleted/updated when reverted, so the file always reflects the CURRENT state.
+
+- Sections: `### Installed packages`, `### Removed/purged packages`, `### Configuration files`, `### Services`,
+  `### Users and groups`, `### Scheduled tasks`, `### Other`.
+- Entries are concise and factual (package name, config path + one-line description, service name + desired state);
+  no timestamps, narration, or command transcripts.
+- SARA creates the file/`~/.config/sara/` (`mkdir -p`) on first change. Only genuine deviations are recorded; read-only
+  inspection commands and transient state are never logged.
+- The file’s current contents are injected into the system prompt at session start by `SystemCustomizationsProvider`
+  (truncated to ~10000 chars with `...[truncated]` to protect the context window), so the agent reconciles against the
+  latest baseline before making further changes.
+
+Implementation: `systemprompt/SystemCustomizationsProvider.kt`.
+
 ### CLI Interaction
 
 - Interactive REPL: reads user input from standard input (System.in).

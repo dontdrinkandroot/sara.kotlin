@@ -39,7 +39,7 @@ data class Configuration(
 fun loadConfiguration(args: Array<String>): Configuration =
     parseCliArguments(args).let { cliArgs ->
         buildConfiguration(
-            configDir = determineConfigDirectory(),
+            configDir = defaultConfigDir(),
             cliModel = cliArgs.model,
             verbose = cliArgs.verbose,
             systemPromptFile = cliArgs.systemPromptFile,
@@ -166,7 +166,7 @@ private fun MutableList<String>.addMissingConfigError(
     add("$envName is not defined. Provide via ${cliPart}env $envName, or in $configDir/.env")
 }
 
-private fun determineConfigDirectory(): Path =
+fun defaultConfigDir(): Path =
     getenv("HOME")
         ?.toKString()
         ?.takeIf(String::isNotEmpty)
