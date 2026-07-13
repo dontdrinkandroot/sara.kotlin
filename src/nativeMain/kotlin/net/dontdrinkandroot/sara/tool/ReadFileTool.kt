@@ -20,6 +20,7 @@ import platform.posix.fopen
 class ReadFileTool : ToolExecutor {
     override val name: String = "read_file"
     override val description: String = "Read the content of a file and return it as a string"
+    override val isSafe: Boolean = true
 
     override fun getFunctionDescription(): FunctionDescription {
         return FunctionDescription(

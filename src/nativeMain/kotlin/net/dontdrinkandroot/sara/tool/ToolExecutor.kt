@@ -9,6 +9,15 @@ interface ToolExecutor {
     val description: String
 
     /**
+     * Whether this tool is safe to execute without explicit user confirmation.
+     *
+     * Safe tools (read-only, side-effect-free) bypass the permission prompt even when brave mode
+     * is disabled. Unsafe tools always prompt unless brave mode is on. Defaults to false.
+     */
+    val isSafe: Boolean
+        get() = false
+
+    /**
      * Returns the function schema for this tool to be sent to the LLM.
      */
     fun getFunctionDescription(): FunctionDescription

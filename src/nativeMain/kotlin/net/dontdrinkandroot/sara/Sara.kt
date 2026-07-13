@@ -30,7 +30,21 @@ class Sara(
     private val llmClient: LlmClient,
     private val toolRegistry: ToolRegistry,
     private val systemPromptProvider: SystemPromptProvider,
+    private val inputReader: InputReader = InputReader { readlnOrNull() },
 ) {
+
+    /**
+     * Reads a single line of user input from the configured source (stdin in production,
+     * a scripted source in tests). Returns null on EOF.
+     */
+    fun interface InputReader {
+        fun readLine(): String?
+    }
+
+    internal sealed interface PermissionResult {
+        data object Allowed : PermissionResult
+        data class Denied(val reason: String?) : PermissionResult
+    }
 
     suspend fun run() {
         val systemPrompt = systemPromptProvider.provide()
@@ -55,7 +69,7 @@ class Sara(
     private fun promptUserInput(): String? {
         terminal.println(cyan("User:"))
         terminal.print("> ")
-        val input = readlnOrNull()
+        val input = inputReader.readLine()
 
         if (input.isNullOrBlank()) {
             terminal.println()
@@ -163,9 +177,12 @@ class Sara(
             return
         }
 
-        if (!isToolExecutionAllowed(toolName, toolArgs)) {
-            addToolErrorMessage(toolCall, toolName, "Error: Tool execution denied by user", messages)
-            logger.warn("Tool execution denied by user")
+        val permission = checkToolPermission(tool, toolArgs)
+        if (permission is PermissionResult.Denied) {
+            val denialMessage = buildDenialMessage(permission.reason)
+            addToolErrorMessage(toolCall, toolName, denialMessage, messages)
+            logger.warn("Tool execution denied by user" + (permission.reason?.takeIf { it.isNotBlank() }
+                ?.let { ": $it" } ?: ""))
             return
         }
 
@@ -174,13 +191,27 @@ class Sara(
         logToolResult(result)
     }
 
-    private fun isToolExecutionAllowed(toolName: String, toolArgs: String): Boolean {
+    internal fun checkToolPermission(tool: ToolExecutor, toolArgs: String): PermissionResult {
         if (configuration.braveMode) {
-            logger.debug("Brave mode enabled: executing tool '$toolName' without confirmation")
-            return true
+            logger.debug("Brave mode enabled: executing tool '${tool.name}' without confirmation")
+            return PermissionResult.Allowed
         }
 
-        return askForToolPermission(toolName, toolArgs)
+        if (tool.isSafe) {
+            logger.debug("Tool '${tool.name}' is safe: executing without confirmation")
+            return PermissionResult.Allowed
+        }
+
+        return askForToolPermission(tool.name, toolArgs)
+    }
+
+    internal fun buildDenialMessage(reason: String?): String {
+        val trimmed = reason?.trim()
+        return if (!trimmed.isNullOrEmpty()) {
+            "Error: Tool execution denied by user. Reason: $trimmed"
+        } else {
+            "Error: Tool execution denied by user"
+        }
     }
 
     private suspend fun executeToolWithErrorHandling(tool: ToolExecutor, toolArgs: String): ToolResult {
@@ -250,11 +281,19 @@ class Sara(
         }
     }
 
-    private fun askForToolPermission(toolName: String, toolArgs: String): Boolean {
+    internal fun askForToolPermission(toolName: String, toolArgs: String): PermissionResult {
         terminal.println("[sara] The assistant wants to use tool '$toolName' with arguments: $toolArgs")
         terminal.print("[sara] Allow execution? [y/N]: ")
-        val response = readlnOrNull()?.trim()?.lowercase()
+        val response = inputReader.readLine()?.trim()?.lowercase()
         terminal.println()
-        return response == "y" || response == "yes"
+
+        if (response == "y" || response == "yes") {
+            return PermissionResult.Allowed
+        }
+
+        terminal.print("[sara] Optional reason for declining (press Enter to omit): ")
+        val reason = inputReader.readLine()
+        terminal.println()
+        return PermissionResult.Denied(reason)
     }
 }

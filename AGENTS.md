@@ -1,7 +1,3 @@
----
-apply: always
----
-
 ## About
 
 * This is the codebase of SARA (System Action & Response Agent), an LLM Agent Interface for the CLI that helps the user
@@ -17,11 +13,6 @@ apply: always
 * Remember that Clean Code implies using speaking variable and function names to avoid unnecessary comments.
 * As we are SOLID, we keep an eye on testability as it will indicate a good separation.
 * We love to use Kotlin sugar if the code remains readable or even helps it.
-
-## General Instructions
-
-* We update this general rules file after performing a task to document new features or other relevant project changes
-  that could be useful for an LLM to get a quick overview.
 
 ## Environment
 
@@ -168,16 +159,30 @@ information).
 ### Tool Calling Support
 
 - The assistant can request tools; SARA exposes the following tools:
-  - `exec_command` — run a local shell command (combined stdout/stderr).
-  - `read_file` — read a file by path.
-  - `write_file` — write content to a file by path.
-  - `web_fetch` — fetch a web page and return its content as Markdown, text, or HTML (always registered).
-  - `web_search` — search the web via Searxng (only registered when `SARA_SEARXNG_URL` is set).
-- By default SARA asks for explicit user confirmation before executing any command and returns combined stdout/stderr as
-  the tool result. During that the spinner is paused.
-- Run with `-b` or `--brave-mode` to skip the confirmation prompts and execute tools automatically.
+  - `exec_command` — run a local shell command (combined stdout/stderr). **unsafe** (always prompts).
+  - `read_file` — read a file by path. **safe** (no prompt). Guarded by the sensitive-data policy in the system prompt.
+  - `write_file` — write content to a file by path. **unsafe** (always prompts).
+  - `web_fetch` — fetch a web page and return its content as Markdown, text, or HTML (always registered). **safe**.
+  - `web_search` — search the web via Searxng (only registered when `SARA_SEARXNG_URL` is set). **safe**.
+- Each `ToolExecutor` declares `val isSafe: Boolean` (default `false`). Safe tools (read-only, side-effect-free)
+  bypass the confirmation prompt even when brave mode is off. Unsafe tools always prompt unless brave mode is on.
+- When a tool is prompted and the user declines, the user may optionally provide a reason (press Enter to omit).
+  The reason (if any) is included in the tool result message sent back to the LLM:
+  `"Error: Tool execution denied by user. Reason: <reason>"` (or `"Error: Tool execution denied by user"` when omitted).
+- Run with `-b` or `--brave-mode` to skip the confirmation prompts and execute tools automatically (overrides `isSafe`).
 - Tool executors implement `suspend fun execute(...)`, so tools may perform suspending I/O (e.g., HTTP). The tool-call
   dispatch loop in `Sara.kt` is suspending and awaits each tool before appending the `role = "tool"` result message.
+- The permission flow (`checkToolPermission`, `askForToolPermission`, `buildDenialMessage`) and `PermissionResult`
+  are `internal` on `Sara` for testability. `InputReader` (a `fun interface`) abstracts stdin so the prompt logic
+  is unit-testable without the REPL.
+
+### Sensitive Data Policy
+
+- `SaraSystemPromptProvider` injects a "Sensitive data policy" section into the system prompt that forbids SARA from
+  reading, displaying, printing, transmitting, or exfiltrating private/secret material under any circumstances.
+- Forbidden examples: `/etc/shadow`, SSH private keys, GPG private keys, cloud/SDK credentials.
+- This is the soft guardrail that complements `read_file` being marked `isSafe = true` (executed without confirmation).
+- The policy applies to `read_file`, `exec_command`, and `web_fetch` alike.
 
 ### Web Search (Searxng)
 

@@ -21,6 +21,7 @@ class WebFetchTool(
 ) : ToolExecutor {
     override val name: String = "web_fetch"
     override val description: String = "Fetch the content of a web page and return it as Markdown, text, or HTML"
+    override val isSafe: Boolean = true
 
     override fun getFunctionDescription(): FunctionDescription {
         return FunctionDescription(

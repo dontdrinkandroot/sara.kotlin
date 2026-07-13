@@ -16,6 +16,7 @@ class WebSearchTool(
 ) : ToolExecutor {
     override val name: String = "web_search"
     override val description: String = "Search the web and return the results"
+    override val isSafe: Boolean = true
 
     override fun getFunctionDescription(): FunctionDescription {
         return FunctionDescription(
