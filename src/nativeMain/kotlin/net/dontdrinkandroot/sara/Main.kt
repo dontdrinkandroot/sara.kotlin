@@ -6,7 +6,11 @@ import net.dontdrinkandroot.sara.configuration.ConfigurationError
 import net.dontdrinkandroot.sara.configuration.loadConfiguration
 import net.dontdrinkandroot.sara.logger.ConsoleLogger
 import net.dontdrinkandroot.sara.logger.LogLevel
-import net.dontdrinkandroot.sara.systemprompt.*
+import net.dontdrinkandroot.sara.systemprompt.ChainedSystemPromptProvider
+import net.dontdrinkandroot.sara.systemprompt.SaraSystemPromptProvider
+import net.dontdrinkandroot.sara.systemprompt.StaticSystemPromptProvider
+import net.dontdrinkandroot.sara.systemprompt.SystemCustomizationsProvider
+import net.dontdrinkandroot.sara.systemprompt.systeminformation.SystemInformationSystemPromptProvider
 import net.dontdrinkandroot.sara.tool.*
 import kotlin.system.exitProcess
 

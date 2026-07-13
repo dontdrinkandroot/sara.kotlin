@@ -1,7 +1,9 @@
-package net.dontdrinkandroot.sara.systemprompt
+package net.dontdrinkandroot.sara.systemprompt.systeminformation
 
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.toKString
+import net.dontdrinkandroot.sara.systemprompt.SystemPromptProvider
+import net.dontdrinkandroot.sara.systemprompt.cmd
 import platform.posix.getenv
 
 @OptIn(ExperimentalForeignApi::class)

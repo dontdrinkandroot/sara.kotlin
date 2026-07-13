@@ -97,23 +97,31 @@ Other CLI options:
 
 If `~/.config/sara/system-prompt.md` exists, its content is prepended to each session as a system message.
 
-In addition, SARA automatically injects useful system context at startup via built‑in providers, in this order:
-
-- System hostname
-- Current OS user
-- Disk usage summary (from `df -h`)
-- Top processes by CPU and memory (from `ps`)
+In addition, SARA automatically injects useful system context at startup via built‑in providers. Each section is
+gathered independently and skipped gracefully if the underlying command/variable is unavailable (one failing section
+never blanks the others).
 
 If present, the user’s `system-prompt.md` is appended after these automatic sections. If the file is missing or empty,
-only the automatic sections are used. If any automatic section cannot be collected (e.g., command unavailable), it is
-skipped gracefully.
+only the automatic sections are used.
 
 The assembled system prompt is built by `ChainedSystemPromptProvider` in `Main.kt` from four providers in this order:
 
 1. `SaraSystemPromptProvider` — built-in persona ("You are Sara…").
 2. `SystemCustomizationsProvider` — System Customizations Log (see below).
 3. `StaticSystemPromptProvider(configuration.systemPrompt)` — the user’s `system-prompt.md` (skipped if absent/empty).
-4. `SystemInformationSystemPromptProvider` — General/Memory/RootFS/CPU/CurrentDirectory sections gathered via `cmd()`.
+4. `SystemInformationSystemPromptProvider` — a `## System Information` block made of the sections below, assembled via
+   `ChainedSystemPromptProvider` (so per-leaf failures are isolated by `safeProvide()`). All providers live in the
+   `systemprompt.systeminformation` subpackage:
+
+  - `### General` — one line per field: Distribution (`/etc/os-release`), Kernel (`uname -s`/`-r`),
+    Architecture (`uname -m`), Hostname (`gethostname()` syscall with `hostname` fallback), Current User (`$USER`),
+    Home Directory (`$HOME`), Timezone (`/etc/timezone` or `date +%Z`), Shell (`$SHELL`), Locale (`$LC_ALL`/`$LANG`),
+    Load average (`/proc/loadavg` or `sysctl vm.loadavg`). Each leaf is a standalone, unit-testable class (e.g.
+    `DistributionProvider.kt`, `HostnameProvider.kt`, …).
+  - `### Memory` — Mem + Swap rows from `free -h` (header included so columns stay labeled).
+  - `### Root Filesystem` — root filesystem usage from `df -h /` (header included).
+  - `### CPU` — `lscpu` key fields, with a `/proc/cpuinfo` fallback (model name + core count, no per-core lines).
+  - `### Current Directory` — `pwd` plus `ls -l` listing (see `CurrentDirectoryProvider.kt`).
 
 The config directory resolver is the shared `defaultConfigDir()` helper in `configuration/Configuration.kt` (
 `$HOME/.config/sara`, `.` fallback).
