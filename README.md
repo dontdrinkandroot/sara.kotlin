@@ -1,10 +1,13 @@
 ### Sara (Kotlin/Native)
 
-A small, fast command-line assistant written in Kotlin/Native. It connects to an LLM API and provides a terminal-based
-experience with optional tools and a configurable system prompt.
+SARA (System Action & Response Agent) is a small, fast command-line assistant written in Kotlin/Native. It connects to
+an OpenAI-compatible LLM API and provides a terminal-based experience with optional tools, a configurable system
+prompt, and automatic injection of useful system context.
 
 - Runs as a single native executable (no JVM required)
 - Targets Linux (x64)
+- Renders LLM responses as Markdown in the terminal
+- Supports tool calling (`exec_command`, `read_file`, `write_file`, `web_fetch`, and optional `web_search`)
 
 #### Download
 
@@ -24,36 +27,53 @@ Replace `<version>` and `<your-os-arch>` with the correct values for the release
 
 #### Configuration
 
-Configuration is resolved with the following precedence:
+Configuration is read from the user config directory `~/.config/sara/` and resolved with the following precedence
+(later overrides earlier):
 
-1. CLI parameters
-2. Environment variables
-3. .env files in `~/.config/sara/` (first `.env`, then `.env.local`)
+1. `~/.config/sara/.env` file values
+2. `~/.config/sara/.env.local` file values (overrides `.env`)
+3. Real environment variables (override both `.env` files)
+4. Command line options (override everything)
 
-Required values:
+Required values (SARA fails fast with a clear error if any is undefined):
 
 - `SARA_MODEL` – model identifier to use
-- `SARA_API_KEY` – API key for the LLM provider
-- `SARA_BASE_URL` – base URL of the LLM API (e.g., `https://openrouter.ai/api/v1`)
+- `SARA_API_KEY` – API key (bearer) for the LLM provider
+- `SARA_BASE_URL` – base URL of the OpenAI-compatible API, without a trailing path
+  (e.g., `https://openrouter.ai/api/v1`)
 
-Optional values/files:
+Optional values:
 
-- System prompt file (used if present): `~/.config/sara/system-prompt.md`
-- You can override the system prompt file path via `--system-prompt-file`
+- `SARA_SEARXNG_URL` – base URL of a Searxng instance. When set, SARA registers a `web_search` tool that queries
+  `${SARA_SEARXNG_URL}/search?format=json`.
+- `SARA_SEARXNG_TOKEN` – optional bearer token sent as `Authorization: Bearer <token>` to the Searxng instance. Ignored
+  if `SARA_SEARXNG_URL` is not set.
 
-Using .env files (create `~/.config/sara/.env` and optionally `~/.config/sara/.env.local`):
+Optional files:
+
+- `~/.config/sara/system-prompt.md` – custom system prompt prepended to each session (absence is not an error).
+- `~/.config/sara/system-customizations.md` – curated state document SARA maintains automatically to track how the
+  system deviates from a default installation. Its contents are injected into the system prompt at session start.
+
+Example `.env` (`~/.config/sara/.env`):
 
 ```
-SARA_MODEL=your-model-id
-SARA_API_KEY=your-api-key
+# OpenRouter
 SARA_BASE_URL=https://openrouter.ai/api/v1
+SARA_MODEL=openai/gpt-4o
+SARA_API_KEY=sk-or-...
+
+# OpenAI
+# SARA_BASE_URL=https://api.openai.com/v1
+# SARA_MODEL=gpt-4o
+# SARA_API_KEY=sk-...
+
+# Optional Searxng (enables the web_search tool)
+# SARA_SEARXNG_URL=http://localhost:8080
+# SARA_SEARXNG_TOKEN=optional-bearer-token
 ```
 
-Notes:
-
-- `.env.local` overrides `.env` entries
-- Real environment variables override both `.env` files
-- CLI flags override everything
+You can also provide `~/.config/sara/.env.local` for local overrides; its entries take precedence over `.env`.
 
 #### Running
 
@@ -63,23 +83,39 @@ Basic usage after configuration:
 ./sara
 ```
 
+The interactive REPL reads input from stdin. Submit an empty line or press `Ctrl+D` (EOF) to end the session.
+
 Common CLI parameters:
 
 - `-m`, `--model <string>` – set/override the model
-- `-s`, `--websearch` – enable web search
-- `-v`, `--verbose` – enable verbose output
-- `--system-prompt-file <path>` – use a specific system prompt file
-- `-b`, `--brave-mode` – skip confirmation for tool execution
+- `-v`, `--verbose` – enable verbose debug output
+- `-b`, `--brave-mode` – skip confirmation prompts and execute tools automatically
+- `--system-prompt-file <path>` – use a specific system prompt file (overrides the default
+  `~/.config/sara/system-prompt.md`)
 
 Examples:
 
 ```
 ./sara --model your-model-id
 ./sara -v
-./sara -s
 ./sara -b
 ./sara --system-prompt-file /path/to/prompt.md
 ```
+
+#### Tools
+
+SARA exposes the following tools to the LLM:
+
+- `exec_command` – run a local shell command (combined stdout/stderr). **unsafe** (always prompts unless brave mode is
+  on).
+- `read_file` – read a file by path. **safe** (no prompt). Guarded by a sensitive-data policy in the system prompt.
+- `write_file` – write content to a file by path. **unsafe** (always prompts unless brave mode is on).
+- `web_fetch` – fetch a web page and return it as Markdown, text, or HTML (always registered). **safe**.
+- `web_search` – search the web via Searxng (only registered when `SARA_SEARXNG_URL` is set). **safe**.
+
+Safe (read-only, side-effect-free) tools bypass the confirmation prompt even when brave mode is off. Unsafe tools always
+prompt unless brave mode is on. When you decline a prompted tool, you may optionally provide a reason that is sent back
+to the LLM.
 
 #### Build from source (optional)
 
@@ -101,18 +137,20 @@ Depending on the target, the binary may be named `sara` or `sara.kexe`.
 
 - CLI flags:
     - `-m`, `--model <string>`
-    - `-s`, `--websearch`
     - `-v`, `--verbose`
-    - `--system-prompt-file <path>`
     - `-b`, `--brave-mode`
+  - `--system-prompt-file <path>`
 - Environment variables:
-    - `SARA_MODEL`
-    - `SARA_API_KEY`
-    - `SARA_BASE_URL`
+  - `SARA_MODEL` (required)
+  - `SARA_API_KEY` (required)
+  - `SARA_BASE_URL` (required)
+  - `SARA_SEARXNG_URL` (optional)
+  - `SARA_SEARXNG_TOKEN` (optional)
 - .env locations:
     - `~/.config/sara/.env`
     - `~/.config/sara/.env.local`
     - Default system prompt file: `~/.config/sara/system-prompt.md`
+  - Auto-maintained customizations file: `~/.config/sara/system-customizations.md`
 
 #### License
 
