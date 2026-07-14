@@ -32,6 +32,18 @@
 
 * We use the `kotlin-test` framework for testing.
 
+### Inspecting the System Prompt
+
+The assembled system prompt can be inspected locally by running the `SystemPromptDumpTest`:
+
+```bash
+./gradlew nativeTest --tests "*.SystemPromptDumpTest.dumpSystemPrompt"
+```
+
+This prints the fully assembled system prompt (persona, customizations, and live system information) to stdout.
+The test is skipped in CI (output suppressed when `CI=true`), but the assertions still execute to validate
+the provider chain works. The test excludes the user-provided `system-prompt.md` to avoid requiring config.
+
 ## Features
 
 ### Configuration loading and precedence
