@@ -37,12 +37,14 @@
 The assembled system prompt can be inspected locally by running the `SystemPromptDumpTest`:
 
 ```bash
-./gradlew nativeTest --tests "*.SystemPromptDumpTest.dumpSystemPrompt"
+./gradlew nativeTest --tests "*.SystemPromptDumpTest.dumpSystemPrompt" --info
 ```
 
-This prints the fully assembled system prompt (persona, customizations, and live system information) to stdout.
-The test is skipped in CI (output suppressed when `CI=true`), but the assertions still execute to validate
-the provider chain works. The test excludes the user-provided `system-prompt.md` to avoid requiring config.
+The test prints the fully assembled system prompt (persona, customizations, and live system information) to stdout.
+Gradle suppresses task stdout by default, so pass `--info` (or `--rerun-tasks --info` to force a fresh run) to actually
+see the `=== SYSTEM PROMPT START ===` ... `=== SYSTEM PROMPT END ===` block and the reported length in the build log.
+The test is skipped in CI (output suppressed when `CI=true`), but the assertions still execute to validate the
+provider chain works. The test excludes the user-provided `system-prompt.md` to avoid requiring config.
 
 ## Features
 
@@ -125,15 +127,22 @@ The assembled system prompt is built by `ChainedSystemPromptProvider` in `Main.k
    `ChainedSystemPromptProvider` (so per-leaf failures are isolated by `safeProvide()`). All providers live in the
    `systemprompt.systeminformation` subpackage:
 
-  - `### General` — one line per field: Distribution (`/etc/os-release`), Kernel (`uname -s`/`-r`),
-    Architecture (`uname -m`), Hostname (`gethostname()` syscall with `hostname` fallback), Current User (`$USER`),
-    Home Directory (`$HOME`), Timezone (`/etc/timezone` or `date +%Z`), Shell (`$SHELL`), Locale (`$LC_ALL`/`$LANG`),
-    Load average (`/proc/loadavg` or `sysctl vm.loadavg`). Each leaf is a standalone, unit-testable class (e.g.
-    `DistributionProvider.kt`, `HostnameProvider.kt`, …).
-  - `### Memory` — Mem + Swap rows from `free -h` (header included so columns stay labeled).
-  - `### Root Filesystem` — root filesystem usage from `df -h /` (header included).
-  - `### CPU` — `lscpu` key fields, with a `/proc/cpuinfo` fallback (model name + core count, no per-core lines).
-  - `### Current Directory` — `pwd` plus `ls -l` listing (see `CurrentDirectoryProvider.kt`).
+- `### General` — one line per field: Date (`date -Is`), Distribution (`/etc/os-release`),
+  Architecture (`uname -m`), Package manager (`command -v` probe in priority order: apt, dnf,
+  yum, pacman, zypper, apk, emerge, nix, rpm-ostree), Sudo (`sudo -n true` probe →
+  `passwordless` / `requires-password` / `unavailable`), Current User (`$USER`),
+  Home Directory (`$HOME`), Timezone (`/etc/timezone` or `date +%Z`), Shell (`$SHELL`),
+  Locale (`$LC_ALL`/`$LANG`). Each leaf is a standalone, unit-testable class (e.g.
+  `DistributionProvider.kt`, `SudoProvider.kt`, …); pure parsers are extracted as `internal fun`s
+  (e.g. `parseDistribution`, `formatSudoStatus`, `detectPackageManager`).
+- `Memory` — single compact line (`Memory: <total> total, <available> available`) from `free -h`
+  (falls back to the `free` column when `available` is absent). See `MemorySectionProvider.kt`.
+- `Root filesystem` — single compact line (`Root filesystem: <size>, <use%> used`) from `df -h /`.
+  See `RootFsSectionProvider.kt`.
+- `### CPU` — `lscpu` core count, with a `/proc/cpuinfo` fallback; emits `CPU(s): N` only
+  (model name and per-core details are dropped as non-actionable). See `CpuSectionProvider.kt`.
+- `### Current Directory` — `pwd` plus `ls -lA` listing (dotfiles included). See
+  `CurrentDirectoryProvider.kt`.
 
 The config directory resolver is the shared `defaultConfigDir()` helper in `configuration/Configuration.kt` (
 `$HOME/.config/sara`, `.` fallback).

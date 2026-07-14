@@ -43,6 +43,19 @@ class DistributionParserTest {
     }
 
     @Test
+    fun doesNotDuplicateVersionWhenPrettyNameLacksCodename() {
+        val osRelease = """
+            NAME="Ubuntu"
+            VERSION="24.04.4 LTS (Noble Numbat)"
+            PRETTY_NAME="Ubuntu 24.04.4 LTS"
+        """.trimIndent()
+
+        // PRETTY_NAME already contains the version core ("24.04.4 LTS");
+        // only the codename differs, so the version must not be appended again.
+        assertEquals("Distribution: Ubuntu 24.04.4 LTS", parseDistribution(osRelease))
+    }
+
+    @Test
     fun reportsUnknownWhenAllAbsent() {
         assertEquals("Distribution: Unknown", parseDistribution(""))
         assertEquals("Distribution: Unknown", parseDistribution("UNRELATED=foo\n"))

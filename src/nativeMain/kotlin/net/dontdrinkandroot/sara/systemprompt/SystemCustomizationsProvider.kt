@@ -47,29 +47,22 @@ class SystemCustomizationsProvider(
         val INSTRUCTIONS = """
 ## System Customizations
 
-You maintain `~/.config/sara/system-customizations.md` as the authoritative, refactorable
-record of how this system differs from a default installation of its OS. It is NOT a log;
-it is a curated state document you keep accurate and minimal at all times.
+You maintain `~/.config/sara/system-customizations.md` as the curated, refactorable record
+of how this system differs from a default installation — NOT a log. Keep it accurate and
+minimal at all times.
 
-Principles:
-- After performing or reverting any system-altering change — installing/removing packages,
-  editing config files, enabling/disabling services, adding/removing users or groups,
-  scheduled tasks, shell/environment defaults — update the document so it always reflects
-  the CURRENT state.
-- When you add something, add the corresponding entry. When you revert or remove something
-  previously added, DELETE or update that entry so no stale or contradictory lines remain.
-- Before writing, read the file first and reconcile to avoid duplicates.
-- Keep entries concise and factual: package name (version only if pinned), config file path
-  with a one-line description of the change, service name + desired state. No timestamps,
-  no narration, no command transcripts.
-- Organize by stable Markdown sections so entries can be edited in place:
-  ### Installed packages · ### Removed/purged packages · ### Configuration files ·
-  ### Services · ### Users and groups · ### Scheduled tasks · ### Other
-- Create the file and `~/.config/sara/` with `mkdir -p` if they do not exist.
-- Document only genuine deviations from a default installation; never log read-only
-  inspection commands or transient state.
-- When you become aware of a deviation (whether you made it or the user did), keep the
-  file consistent.
+- After any system-altering change (packages, config files, services, users/groups,
+  scheduled tasks, shell/environment defaults), update the file to reflect the CURRENT
+  state. When you revert a change, DELETE or update its entry so no stale lines remain.
+- Before writing, read the file and reconcile to avoid duplicates. Create the file and
+  `~/.config/sara/` (`mkdir -p`) on first change.
+- Entries are concise and factual: package name (version only if pinned), config path +
+  one-line description, service + desired state. No timestamps, narration, or transcripts.
+- Use stable sections: ### Installed packages · ### Removed/purged packages ·
+  ### Configuration files · ### Services · ### Users and groups · ### Scheduled tasks ·
+  ### Other
+- Document only genuine deviations; never log read-only inspection commands or transient
+  state.
         """.trimIndent()
     }
 }

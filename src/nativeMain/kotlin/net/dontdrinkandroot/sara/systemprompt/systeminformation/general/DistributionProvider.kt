@@ -23,6 +23,11 @@ internal fun parseDistribution(content: String): String {
 
     return buildString {
         append("Distribution: ${prettyName ?: name ?: "Unknown"}")
-        if (!version.isNullOrBlank() && prettyName?.contains(version) != true) append(" $version")
+        if (!version.isNullOrBlank()) {
+            val versionCore = version.substringBefore('(').trim()
+            val alreadyInPrettyName = versionCore.isNotBlank() &&
+                    prettyName?.contains(versionCore) == true
+            if (!alreadyInPrettyName) append(" $version")
+        }
     }
 }
