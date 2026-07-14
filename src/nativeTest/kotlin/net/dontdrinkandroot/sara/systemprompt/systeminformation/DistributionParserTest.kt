@@ -1,5 +1,7 @@
 package net.dontdrinkandroot.sara.systemprompt.systeminformation
 
+import net.dontdrinkandroot.sara.systemprompt.systeminformation.general.parseDistribution
+
 import kotlin.test.Test
 import kotlin.test.assertEquals
 

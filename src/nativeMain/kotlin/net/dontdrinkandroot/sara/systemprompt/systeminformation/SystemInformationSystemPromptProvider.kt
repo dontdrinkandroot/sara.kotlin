@@ -2,6 +2,7 @@ package net.dontdrinkandroot.sara.systemprompt.systeminformation
 
 import net.dontdrinkandroot.sara.systemprompt.ChainedSystemPromptProvider
 import net.dontdrinkandroot.sara.systemprompt.SystemPromptProvider
+import net.dontdrinkandroot.sara.systemprompt.systeminformation.general.GeneralSectionProvider
 
 /**
  * Injects a "## System Information" block at session start: General / Memory / Root FS /

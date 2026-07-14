@@ -1,4 +1,4 @@
-package net.dontdrinkandroot.sara.systemprompt.systeminformation
+package net.dontdrinkandroot.sara.systemprompt.systeminformation.general
 
 import net.dontdrinkandroot.sara.systemprompt.ChainedSystemPromptProvider
 import net.dontdrinkandroot.sara.systemprompt.StaticSystemPromptProvider

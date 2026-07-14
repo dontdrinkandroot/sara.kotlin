@@ -1,4 +1,4 @@
-package net.dontdrinkandroot.sara.systemprompt.systeminformation
+package net.dontdrinkandroot.sara.systemprompt.systeminformation.general
 
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.toKString
