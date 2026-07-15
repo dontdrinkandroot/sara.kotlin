@@ -26,6 +26,8 @@ fun main(args: Array<String>) {
     val terminal = Terminal()
     val logger = ConsoleLogger(terminal, if (configuration.verbose) LogLevel.DEBUG else LogLevel.INFO)
 
+    SignalInterruptSource.install()
+
     logger.debug("Config loaded")
     logger.debug("searxngUrl=${configuration.searxngUrl}, verbose=${configuration.verbose}, braveMode=${configuration.braveMode}")
     logger.debug("model=${configuration.model}")
@@ -44,7 +46,7 @@ fun main(args: Array<String>) {
         }
     }
 
-    val llmClient = LlmClient(
+    val llmClient: LlmClient = DefaultLlmClient(
         baseUrl = configuration.baseUrl,
         apiKey = configuration.apiKey,
         siteUrl = "sara.dontdrinkandroot.net",

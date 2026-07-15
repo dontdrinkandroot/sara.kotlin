@@ -1,7 +1,5 @@
 package net.dontdrinkandroot.sara.tool
 
-import ToolExecutor
-import ToolResult
 import kotlinx.serialization.json.JsonObject
 import net.dontdrinkandroot.sara.FunctionDescription
 import net.dontdrinkandroot.sara.SearxngClient

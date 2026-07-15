@@ -169,6 +169,13 @@ Implementation: `systemprompt/SystemCustomizationsProvider.kt`.
 
 - Interactive REPL: reads user input from standard input (System.in).
 - Session ends when the user submits an empty line or EOF (Ctrl+D) is encountered.
+- **Ctrl+C (SIGINT) interrupts** the current turn (LLM request, tool execution, or permission prompt) and
+  returns to the `User:` prompt. A second Ctrl+C force-exits the process (safety net for stuck blocking calls).
+  At the prompt, Ctrl+C exits the program (same as Ctrl+D).
+- When a turn is interrupted, a system message (`"The user interrupted this turn. Stop and wait for the next user
+  message."`) is appended to the conversation so the LLM reconciles the partial state.
+- The SIGINT handler is installed via `SignalInterruptSource` (POSIX `signal()`). The `InterruptSource` interface
+  is injected into `Sara` for testability (tests use `FakeInterruptSource`).
 - Verbose mode (-v/--verbose) prints a short REPL start hint.
 
 ### Verbose Debug Logging
@@ -202,8 +209,14 @@ information).
 - Tool executors implement `suspend fun execute(...)`, so tools may perform suspending I/O (e.g., HTTP). The tool-call
   dispatch loop in `Sara.kt` is suspending and awaits each tool before appending the `role = "tool"` result message.
 - The permission flow (`checkToolPermission`, `askForToolPermission`, `buildDenialMessage`) and `PermissionResult`
-  are `internal` on `Sara` for testability. `InputReader` (a `fun interface`) abstracts stdin so the prompt logic
-  is unit-testable without the REPL.
+  (with `Allowed`, `Denied`, and `Interrupted` variants) are `internal` on `Sara` for testability. `InputReader`
+  (a `fun interface`) abstracts stdin so the prompt logic is unit-testable without the REPL. `InterruptSource`
+  abstracts the SIGINT mechanism so interrupt behavior is testable with `FakeInterruptSource`.
+- The tool-call dispatch loop checks `coroutineContext.ensureActive()` at the top of each iteration (both the
+  model-response loop and the tool-call loop), so a Ctrl+C interrupt between tool calls is caught promptly.
+- `fetchLlmResponse` wraps the ktor request in a `coroutineScope` with a progress-spinner child job that is
+  `cancelAndJoin`ed in a `finally` block, and `clearProgressLine()` is also in a `finally` so the spinner is
+  always cleaned up on both normal completion and cancellation.
 
 ### Sensitive Data Policy
 

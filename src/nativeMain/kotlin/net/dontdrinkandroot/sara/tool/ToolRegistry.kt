@@ -1,6 +1,5 @@
 package net.dontdrinkandroot.sara.tool
 
-import ToolExecutor
 import net.dontdrinkandroot.sara.Tool
 
 /**

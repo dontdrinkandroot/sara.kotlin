@@ -1,22 +1,25 @@
 package net.dontdrinkandroot.sara
 
-import ToolExecutor
-import ToolResult
 import com.github.ajalt.mordant.animation.coroutines.animateInCoroutine
 import com.github.ajalt.mordant.markdown.Markdown
-import com.github.ajalt.mordant.rendering.TextColors.cyan
-import com.github.ajalt.mordant.rendering.TextColors.green
+import com.github.ajalt.mordant.rendering.TextColors.*
 import com.github.ajalt.mordant.terminal.Terminal
 import com.github.ajalt.mordant.widgets.Spinner
 import com.github.ajalt.mordant.widgets.progress.progressBarLayout
 import com.github.ajalt.mordant.widgets.progress.spinner
 import com.github.ajalt.mordant.widgets.progress.text
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
 import net.dontdrinkandroot.sara.configuration.Configuration
 import net.dontdrinkandroot.sara.logger.Logger
 import net.dontdrinkandroot.sara.systemprompt.SystemPromptProvider
+import net.dontdrinkandroot.sara.tool.ToolExecutor
 import net.dontdrinkandroot.sara.tool.ToolRegistry
+import net.dontdrinkandroot.sara.tool.ToolResult
+import kotlin.coroutines.coroutineContext
 
 /**
  * Sara application core: handles the interactive REPL and tool-calling loop.
@@ -30,6 +33,7 @@ class Sara(
     private val llmClient: LlmClient,
     private val toolRegistry: ToolRegistry,
     private val systemPromptProvider: SystemPromptProvider,
+    private val interruptSource: InterruptSource = SignalInterruptSource,
     private val inputReader: InputReader = InputReader { readlnOrNull() },
 ) {
 
@@ -44,6 +48,7 @@ class Sara(
     internal sealed interface PermissionResult {
         data object Allowed : PermissionResult
         data class Denied(val reason: String?) : PermissionResult
+        data object Interrupted : PermissionResult
     }
 
     suspend fun run() {
@@ -62,7 +67,7 @@ class Sara(
             messages.add(Message(role = "user", content = userInput))
             println()
 
-            processConversationTurn(messages)
+            runTurnWithInterrupt(messages)
         }
     }
 
@@ -80,10 +85,44 @@ class Sara(
         return input
     }
 
+    /**
+     * Runs a single conversation turn, allowing the user to interrupt it with Ctrl+C.
+     *
+     * Before the turn starts any stale interrupt flag is consumed (e.g. one raised at the
+     * prompt). The turn runs in a child [Job] that the [InterruptSource] can cancel when an
+     * interrupt arrives. On cancellation a system message is appended so the LLM reconciles
+     * the partial state before the next user message.
+     */
+    private suspend fun runTurnWithInterrupt(messages: MutableList<Message>) {
+        interruptSource.consumeInterrupt()
+
+        val turnCancelled = coroutineScope {
+            val turnJob = launch { processConversationTurn(messages) }
+            interruptSource.setTurnJob(turnJob)
+            try {
+                turnJob.join()
+            } finally {
+                interruptSource.setTurnJob(null)
+            }
+            turnJob.isCancelled
+        }
+
+        if (turnCancelled) {
+            terminal.println(red("\n^C Interrupted."))
+            messages.add(
+                Message(
+                    role = "system",
+                    content = "The user interrupted this turn. Stop and wait for the next user message."
+                )
+            )
+        }
+    }
+
     private suspend fun processConversationTurn(messages: MutableList<Message>) {
         var awaitingModelResponse = true
 
         while (awaitingModelResponse) {
+            coroutineContext.ensureActive()
             val response = fetchLlmResponse(messages)
             val message = extractMessageFromResponse(response) ?: run {
                 awaitingModelResponse = false
@@ -110,23 +149,25 @@ class Sara(
             text { "Processing" }
         }.animateInCoroutine(terminal, total = 1)
 
-        val response = coroutineScope {
-            val progressJob = launch { progress.execute() }
-            try {
-                llmClient.chatCompletion(
-                    configuration.model,
-                    messages = messages,
-                    tools = toolRegistry.getToolSchemas(),
-                ).also {
-                    progress.update { completed = 1 }
+        try {
+            val response = coroutineScope {
+                val progressJob = launch { progress.execute() }
+                try {
+                    llmClient.chatCompletion(
+                        configuration.model,
+                        messages = messages,
+                        tools = toolRegistry.getToolSchemas(),
+                    ).also {
+                        progress.update { completed = 1 }
+                    }
+                } finally {
+                    progressJob.cancelAndJoin()
                 }
-            } finally {
-                progressJob.join()
             }
+            return response
+        } finally {
+            clearProgressLine()
         }
-
-        clearProgressLine()
-        return response
     }
 
     private fun clearProgressLine() {
@@ -160,6 +201,7 @@ class Sara(
         messages.add(message)
 
         for (toolCall in message.toolCalls) {
+            coroutineContext.ensureActive()
             executeToolCall(toolCall, messages)
         }
     }
@@ -178,12 +220,20 @@ class Sara(
         }
 
         val permission = checkToolPermission(tool, toolArgs)
-        if (permission is PermissionResult.Denied) {
-            val denialMessage = buildDenialMessage(permission.reason)
-            addToolErrorMessage(toolCall, toolName, denialMessage, messages)
-            logger.warn("Tool execution denied by user" + (permission.reason?.takeIf { it.isNotBlank() }
-                ?.let { ": $it" } ?: ""))
-            return
+        when (permission) {
+            PermissionResult.Interrupted ->
+                throw CancellationException("Interrupted by user (Ctrl+C) at permission prompt")
+
+            is PermissionResult.Denied -> {
+                val denialMessage = buildDenialMessage(permission.reason)
+                addToolErrorMessage(toolCall, toolName, denialMessage, messages)
+                logger.warn("Tool execution denied by user" + (permission.reason?.takeIf { it.isNotBlank() }
+                    ?.let { ": $it" } ?: ""))
+                return
+            }
+
+            PermissionResult.Allowed -> { /* continue to execute */
+            }
         }
 
         val result = executeToolWithErrorHandling(tool, toolArgs)
@@ -284,15 +334,25 @@ class Sara(
     internal fun askForToolPermission(toolName: String, toolArgs: String): PermissionResult {
         terminal.println("[sara] The assistant wants to use tool '$toolName' with arguments: $toolArgs")
         terminal.print("[sara] Allow execution? [y/N]: ")
-        val response = inputReader.readLine()?.trim()?.lowercase()
+        val response = inputReader.readLine()
+
+        if (interruptSource.consumeInterrupt()) {
+            return PermissionResult.Interrupted
+        }
+
         terminal.println()
 
-        if (response == "y" || response == "yes") {
+        if (response?.trim()?.lowercase() == "y" || response?.trim()?.lowercase() == "yes") {
             return PermissionResult.Allowed
         }
 
         terminal.print("[sara] Optional reason for declining (press Enter to omit): ")
         val reason = inputReader.readLine()
+
+        if (interruptSource.consumeInterrupt()) {
+            return PermissionResult.Interrupted
+        }
+
         terminal.println()
         return PermissionResult.Denied(reason)
     }

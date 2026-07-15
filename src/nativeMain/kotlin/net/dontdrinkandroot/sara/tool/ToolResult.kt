@@ -1,3 +1,5 @@
+package net.dontdrinkandroot.sara.tool
+
 /**
  * Result of a tool execution.
  */

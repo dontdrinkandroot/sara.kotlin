@@ -23,12 +23,28 @@ import kotlinx.serialization.json.*
 /**
  * OpenAI-compatible client for chat completions.
  */
-class LlmClient(
+interface LlmClient {
+    suspend fun chatCompletion(
+        model: String,
+        messages: List<Message>,
+        maxTokens: Int? = null,
+        temperature: Double? = null,
+        topP: Double? = null,
+        frequencyPenalty: Double? = null,
+        presencePenalty: Double? = null,
+        tools: List<Tool>? = null,
+        toolChoice: ToolChoice? = null
+    ): ChatCompletionResponse
+
+    fun close()
+}
+
+class DefaultLlmClient(
     private val baseUrl: String,
     private val apiKey: String,
     private val siteUrl: String? = null,
     private val siteTitle: String? = null
-) {
+) : LlmClient {
     private val client = HttpClient {
         install(ContentNegotiation) {
             json(Json {
@@ -53,16 +69,16 @@ class LlmClient(
      * @param toolChoice Optional tool choice strategy
      * @return The completion response
      */
-    suspend fun chatCompletion(
+    override suspend fun chatCompletion(
         model: String,
         messages: List<Message>,
-        maxTokens: Int? = null,
-        temperature: Double? = null,
-        topP: Double? = null,
-        frequencyPenalty: Double? = null,
-        presencePenalty: Double? = null,
-        tools: List<Tool>? = null,
-        toolChoice: ToolChoice? = null
+        maxTokens: Int?,
+        temperature: Double?,
+        topP: Double?,
+        frequencyPenalty: Double?,
+        presencePenalty: Double?,
+        tools: List<Tool>?,
+        toolChoice: ToolChoice?
     ): ChatCompletionResponse {
         val request = ChatCompletionRequest(
             model = model,
@@ -93,7 +109,7 @@ class LlmClient(
         return response.body()
     }
 
-    fun close() {
+    override fun close() {
         client.close()
     }
 }

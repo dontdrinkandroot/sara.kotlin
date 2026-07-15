@@ -1,3 +1,5 @@
+package net.dontdrinkandroot.sara.tool
+
 import kotlinx.serialization.json.JsonObject
 import net.dontdrinkandroot.sara.FunctionDescription
 

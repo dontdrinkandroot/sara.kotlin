@@ -1,13 +1,13 @@
 package net.dontdrinkandroot.sara
 
-import ToolExecutor
-import ToolResult
 import com.github.ajalt.mordant.terminal.Terminal
 import kotlinx.serialization.json.JsonObject
 import net.dontdrinkandroot.sara.configuration.Configuration
 import net.dontdrinkandroot.sara.logger.Logger
 import net.dontdrinkandroot.sara.systemprompt.SystemPromptProvider
+import net.dontdrinkandroot.sara.tool.ToolExecutor
 import net.dontdrinkandroot.sara.tool.ToolRegistry
+import net.dontdrinkandroot.sara.tool.ToolResult
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -29,7 +29,7 @@ class SaraToolPermissionTest {
             terminal = terminal,
             configuration = configuration,
             logger = logger,
-            llmClient = LlmClient("http://localhost", "test-key"),
+            llmClient = DefaultLlmClient("http://localhost", "test-key"),
             toolRegistry = ToolRegistry(),
             systemPromptProvider = object : SystemPromptProvider {
                 override fun provide() = ""

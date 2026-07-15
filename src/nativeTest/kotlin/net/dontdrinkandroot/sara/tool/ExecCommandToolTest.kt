@@ -1,6 +1,5 @@
 package net.dontdrinkandroot.sara.tool
 
-import ToolResult
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlin.coroutines.Continuation
