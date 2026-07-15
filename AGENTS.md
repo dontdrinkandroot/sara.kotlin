@@ -219,9 +219,15 @@ information).
   abstracts the SIGINT mechanism so interrupt behavior is testable with `FakeInterruptSource`.
 - The tool-call dispatch loop checks `coroutineContext.ensureActive()` at the top of each iteration (both the
   model-response loop and the tool-call loop), so a Ctrl+C interrupt between tool calls is caught promptly.
-- `fetchLlmResponse` wraps the ktor request in a `coroutineScope` with a progress-spinner child job that is
-  `cancelAndJoin`ed in a `finally` block, and `clearProgressLine()` is also in a `finally` so the spinner is
-  always cleaned up on both normal completion and cancellation.
+- `fetchLlmResponse` wraps the ktor request in a `coroutineScope` with a Mordant progress-spinner
+  child job launched via `progress.execute()`. Cleanup happens in a `finally` block wrapped in
+  `withContext(NonCancellable)` so the spinner is always torn down even when Ctrl+C cancels the
+  turn mid-request: the progress task is marked complete (`progress.update { completed = 1 }`),
+  the execute job is `join`ed (it exits naturally because the task is finished — do NOT use
+  `cancelAndJoin`, which leaves Mordant's terminal interceptor installed and the cursor hidden),
+  and finally `progress.clear()` removes the frame, uninstalls the interceptor, and restores the
+  cursor. Never bypass Mordant with a manual `terminal.cursor.move { ... }` clear: that leaves the
+  interceptor in place and causes the spinner to be re-drawn on every subsequent print.
 
 ### Sensitive Data Policy
 

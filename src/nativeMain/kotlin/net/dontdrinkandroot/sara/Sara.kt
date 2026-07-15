@@ -9,10 +9,11 @@ import com.github.ajalt.mordant.widgets.progress.progressBarLayout
 import com.github.ajalt.mordant.widgets.progress.spinner
 import com.github.ajalt.mordant.widgets.progress.text
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import net.dontdrinkandroot.sara.configuration.Configuration
 import net.dontdrinkandroot.sara.logger.Logger
 import net.dontdrinkandroot.sara.systemprompt.SystemPromptProvider
@@ -149,31 +150,21 @@ class Sara(
             text { "Processing" }
         }.animateInCoroutine(terminal, total = 1)
 
-        try {
-            val response = coroutineScope {
-                val progressJob = launch { progress.execute() }
-                try {
-                    llmClient.chatCompletion(
-                        configuration.model,
-                        messages = messages,
-                        tools = toolRegistry.getToolSchemas(),
-                    ).also {
-                        progress.update { completed = 1 }
-                    }
-                } finally {
-                    progressJob.cancelAndJoin()
+        return coroutineScope {
+            val progressJob = launch { progress.execute() }
+            try {
+                llmClient.chatCompletion(
+                    configuration.model,
+                    messages = messages,
+                    tools = toolRegistry.getToolSchemas(),
+                )
+            } finally {
+                withContext(NonCancellable) {
+                    progress.update { completed = 1 }
+                    progressJob.join()
+                    progress.clear()
                 }
             }
-            return response
-        } finally {
-            clearProgressLine()
-        }
-    }
-
-    private fun clearProgressLine() {
-        terminal.cursor.move {
-            up(1)
-            clearLine()
         }
     }
 
