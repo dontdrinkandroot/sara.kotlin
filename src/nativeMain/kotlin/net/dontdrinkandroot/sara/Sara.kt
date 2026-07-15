@@ -95,6 +95,7 @@ class Sara(
      * the partial state before the next user message.
      */
     private suspend fun runTurnWithInterrupt(messages: MutableList<Message>) {
+        // Clear any stale flag from the prompt phase (e.g. Ctrl+C pressed at the prompt).
         interruptSource.consumeInterrupt()
 
         val turnCancelled = coroutineScope {
@@ -107,6 +108,10 @@ class Sara(
             }
             turnJob.isCancelled
         }
+
+        // Consume the flag that was set by the signal handler during this turn so it cannot
+        // bleed into the next turn or cause a force-exit at the next prompt.
+        interruptSource.consumeInterrupt()
 
         if (turnCancelled) {
             terminal.println(red("\n^C Interrupted."))

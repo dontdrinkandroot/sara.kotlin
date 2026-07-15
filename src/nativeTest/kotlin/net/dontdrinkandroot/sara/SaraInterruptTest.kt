@@ -123,6 +123,46 @@ class SaraInterruptTest {
     }
 
     @Test
+    fun staleInterruptFlagDoesNotBleedIntoNextTurn() = runBlocking {
+        val interruptSource = FakeInterruptSource()
+        val llmCallStarted = CompletableDeferred<Unit>()
+        var callCount = 0
+        val llmClient = object : LlmClient {
+            override suspend fun chatCompletion(
+                model: String,
+                messages: List<Message>,
+                maxTokens: Int?,
+                temperature: Double?,
+                topP: Double?,
+                frequencyPenalty: Double?,
+                presencePenalty: Double?,
+                tools: List<Tool>?,
+                toolChoice: ToolChoice?
+            ): ChatCompletionResponse {
+                callCount++
+                if (callCount == 1) {
+                    llmCallStarted.complete(Unit)
+                    delay(Long.MAX_VALUE)
+                    error("should not reach here")
+                }
+                return assistantResponse("Hello back!")
+            }
+
+            override fun close() {}
+        }
+
+        val inputs = mutableListOf("hello", "what was the last message?", "")
+        val sara = sara(interruptSource, llmClient, inputs)
+
+        val saraJob = launch { sara.run() }
+        llmCallStarted.await()
+        interruptSource.trigger()
+
+        withTimeout(5000) { saraJob.join() }
+        assertTrue(callCount == 2, "LLM should be called twice: first interrupted, second completes. Got $callCount")
+    }
+
+    @Test
     fun interruptAtPermissionPromptReturnsInterrupted() {
         val interruptSource = FakeInterruptSource()
         val llmClient = object : LlmClient {
