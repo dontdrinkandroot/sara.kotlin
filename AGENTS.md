@@ -197,6 +197,11 @@ information).
 - The assistant can request tools; SARA exposes the following tools:
   - `exec_command` — run a local shell command (combined stdout/stderr). **unsafe** (always prompts).
   - `read_file` — read a file by path. **safe** (no prompt). Guarded by the sensitive-data policy in the system prompt.
+    Optional arguments: `offset` (0-based character offset to start at, default 0) and `limit` (max characters to
+    read, default 10000) to keep large files from polluting the context window. When the file has more content
+    beyond the returned window, a `...[truncated, continue with offset=<nextOffset>, file has <total> characters]`
+    marker is appended so the agent can paginate by setting `offset` to the next offset. If `offset` is at or beyond
+    the end of file, a `[offset <N> is at or beyond end of file (<total> characters)]` footer is returned instead.
   - `write_file` — write content to a file by path. **unsafe** (always prompts).
   - `web_fetch` — fetch a web page and return its content as Markdown, text, or HTML (always registered). **safe**.
   - `web_search` — search the web via Searxng (only registered when `SARA_SEARXNG_URL` is set). **safe**.
