@@ -120,7 +120,10 @@ only the automatic sections are used.
 
 The assembled system prompt is built by `ChainedSystemPromptProvider` in `Main.kt` from four providers in this order:
 
-1. `SaraSystemPromptProvider` — built-in persona ("You are Sara…").
+1. `SaraSystemPromptProvider` — built-in persona ("You are Sara…") plus a `## Web tool usage`
+   section that nudges the agent to prefer `web_search`/`web_fetch` for unfamiliar,
+   fast-moving, or version-specific topics (and to skip them for stable, well-known facts
+   or when the answer is already available locally).
 2. `SystemCustomizationsProvider` — System Customizations Log (see below).
 3. `StaticSystemPromptProvider(configuration.systemPrompt)` — the user’s `system-prompt.md` (skipped if absent/empty).
 4. `SystemInformationSystemPromptProvider` — a `## System Information` block made of the sections below, assembled via
@@ -250,6 +253,9 @@ information).
   - `write_file` — write content to a file by path. **unsafe** (always prompts).
   - `web_fetch` — fetch a web page and return its content as Markdown, text, or HTML (always registered). **safe**.
   - `web_search` — search the web via Searxng (only registered when `SARA_SEARXNG_URL` is set). **safe**.
+  - The persona (`SaraSystemPromptProvider`) explicitly encourages eager use of these web
+    tools for unfamiliar or version-specific topics, while skipping them for stable,
+    well-known facts or when the local system already provides the answer.
 - Each `ToolExecutor` declares `val isSafe: Boolean` (default `false`). Safe tools (read-only, side-effect-free)
   bypass the confirmation prompt even when brave mode is off. Unsafe tools always prompt unless brave mode is on.
 - Each `ToolExecutor` also declares `val availableInPlanMode: Boolean` (default `true`). Tools that can modify the
