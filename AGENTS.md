@@ -170,13 +170,58 @@ Implementation: `systemprompt/SystemCustomizationsProvider.kt`.
 - Interactive REPL: reads user input from standard input (System.in).
 - Session ends when the user submits an empty line or EOF (Ctrl+D) is encountered.
 - **Ctrl+C (SIGINT) interrupts** the current turn (LLM request, tool execution, or permission prompt) and
-  returns to the `User:` prompt. A second Ctrl+C force-exits the process (safety net for stuck blocking calls).
+  returns to the prompt. A second Ctrl+C force-exits the process (safety net for stuck blocking calls).
   At the prompt, Ctrl+C exits the program (same as Ctrl+D).
 - When a turn is interrupted, a system message (`"The user interrupted this turn. Stop and wait for the next user
   message."`) is appended to the conversation so the LLM reconciles the partial state.
 - The SIGINT handler is installed via `SignalInterruptSource` (POSIX `signal()`). The `InterruptSource` interface
   is injected into `Sara` for testability (tests use `FakeInterruptSource`).
 - Verbose mode (-v/--verbose) prints a short REPL start hint.
+
+### Plan / Execution Mode
+
+SARA supports two operational modes that control how the agent interacts with the system:
+
+- **Execution mode** (`exec`) — the default. All tools are available and the agent may perform
+  system modifications.
+- **Plan mode** (`plan`) — read-only mode. The `write_file` tool is excluded from the tool list
+  sent to the LLM (hard guardrail). Additionally, a system message instructs the agent not to
+  modify the system state through any tool, including `exec_command` — which in plan mode is
+  restricted to read-only inspection commands (no `rm`, `mv`, `mkdir`, `apt install`,
+  `systemctl start/stop/enable`, `chmod`, `chown`, …). It should only read, analyze, observe,
+  and plan.
+
+Switching:
+
+- Type `/plan` at the prompt to enter plan mode.
+- Type `/exec` at the prompt to return to execution mode.
+- The mode is shown in the prompt: `User [plan]:` or `User [exec]:`.
+- Switching to the current mode is a no-op (no duplicate system message).
+- On mode switch, a system message is appended to the conversation so the LLM is aware of the
+  constraint. The mode resets to `exec` on each new session.
+
+Tool availability per mode:
+
+| Tool           | exec | plan   |
+|----------------|------|--------|
+| `exec_command` | yes  | yes    |
+| `read_file`    | yes  | yes    |
+| `write_file`   | yes  | **no** |
+| `web_fetch`    | yes  | yes    |
+| `web_search`   | yes  | yes    |
+
+Each `ToolExecutor` declares `val availableInPlanMode: Boolean` (default `true`). Tools that
+can modify the system (e.g. `write_file`) override this to `false`. The `ToolRegistry.getToolSchemas`
+method accepts an optional filter predicate used by `Sara` to exclude plan-unsafe tools.
+
+Implementation: `Mode.kt` (enum with `label` and `instruction`), `ToolExecutor.availableInPlanMode`,
+`WriteFileTool` (override), `ToolRegistry.getToolSchemas(filter)`, `Sara.kt` (mode state, prompt,
+`/plan`/`/exec` handling, tool filtering in `fetchLlmResponse`).
+
+The modes are also described statically in `SaraSystemPromptProvider` (a `## Modes` section in the
+base system prompt) so the agent always knows modes exist and can suggest `/plan` or `/exec`. The
+dynamic `Mode.instruction` injected on each switch is a pointed reminder of the *current* mode's
+constraints — for PLAN it enumerates forbidden `exec_command` actions explicitly.
 
 ### Verbose Debug Logging
 
@@ -207,6 +252,8 @@ information).
   - `web_search` — search the web via Searxng (only registered when `SARA_SEARXNG_URL` is set). **safe**.
 - Each `ToolExecutor` declares `val isSafe: Boolean` (default `false`). Safe tools (read-only, side-effect-free)
   bypass the confirmation prompt even when brave mode is off. Unsafe tools always prompt unless brave mode is on.
+- Each `ToolExecutor` also declares `val availableInPlanMode: Boolean` (default `true`). Tools that can modify the
+  system (e.g. `write_file`) override this to `false` so they are excluded in plan mode.
 - When a tool is prompted and the user declines, the user may optionally provide a reason (press Enter to omit).
   The reason (if any) is included in the tool result message sent back to the LLM:
   `"Error: Tool execution denied by user. Reason: <reason>"` (or `"Error: Tool execution denied by user"` when omitted).

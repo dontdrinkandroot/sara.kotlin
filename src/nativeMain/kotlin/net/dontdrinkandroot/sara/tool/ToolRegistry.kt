@@ -26,12 +26,14 @@ class ToolRegistry {
     fun getAll(): List<ToolExecutor> = tools.values.toList()
 
     /**
-     * Returns tool schemas for the OpenRouter API.
+     * Returns tool schemas for the OpenRouter API, optionally filtered.
      */
-    fun getToolSchemas(): List<Tool> = tools.values.map { executor ->
-        Tool(
-            type = "function",
-            function = executor.getFunctionDescription()
-        )
-    }
+    fun getToolSchemas(filter: (ToolExecutor) -> Boolean = { true }): List<Tool> = tools.values
+        .filter(filter)
+        .map { executor ->
+            Tool(
+                type = "function",
+                function = executor.getFunctionDescription()
+            )
+        }
 }

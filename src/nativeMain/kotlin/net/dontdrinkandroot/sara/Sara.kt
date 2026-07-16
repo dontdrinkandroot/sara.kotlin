@@ -38,6 +38,8 @@ class Sara(
     private val inputReader: InputReader = InputReader { readlnOrNull() },
 ) {
 
+    private var currentMode: Mode = Mode.EXEC
+
     /**
      * Reads a single line of user input from the configured source (stdin in production,
      * a scripted source in tests). Returns null on EOF.
@@ -65,6 +67,29 @@ class Sara(
     private suspend fun runConversationLoop(messages: MutableList<Message>) {
         while (true) {
             val userInput = promptUserInput() ?: break
+
+            when (userInput.trim()) {
+                "/plan" -> {
+                    if (currentMode != Mode.PLAN) {
+                        currentMode = Mode.PLAN
+                        terminal.println("[sara] Switched to plan mode.")
+                        println()
+                        messages.add(Message(role = "system", content = Mode.PLAN.instruction))
+                    }
+                    continue
+                }
+
+                "/exec" -> {
+                    if (currentMode != Mode.EXEC) {
+                        currentMode = Mode.EXEC
+                        terminal.println("[sara] Switched to execution mode.")
+                        println()
+                        messages.add(Message(role = "system", content = Mode.EXEC.instruction))
+                    }
+                    continue
+                }
+            }
+
             messages.add(Message(role = "user", content = userInput))
             println()
 
@@ -73,7 +98,7 @@ class Sara(
     }
 
     private fun promptUserInput(): String? {
-        terminal.println(cyan("User:"))
+        terminal.println(cyan("User [${currentMode.label}]:"))
         terminal.print("> ")
         val input = inputReader.readLine()
 
@@ -161,7 +186,9 @@ class Sara(
                 llmClient.chatCompletion(
                     configuration.model,
                     messages = messages,
-                    tools = toolRegistry.getToolSchemas(),
+                    tools = toolRegistry.getToolSchemas {
+                        it.availableInPlanMode || currentMode != Mode.PLAN
+                    },
                 )
             } finally {
                 withContext(NonCancellable) {

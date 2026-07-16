@@ -3,7 +3,6 @@ package net.dontdrinkandroot.sara
 import com.github.ajalt.mordant.terminal.Terminal
 import kotlinx.coroutines.*
 import net.dontdrinkandroot.sara.configuration.Configuration
-import net.dontdrinkandroot.sara.logger.Logger
 import net.dontdrinkandroot.sara.systemprompt.SystemPromptProvider
 import net.dontdrinkandroot.sara.tool.ToolRegistry
 import kotlin.concurrent.AtomicReference
@@ -188,13 +187,6 @@ class SaraInterruptTest {
         val result = sara.askForToolPermission("test_tool", "{}")
 
         assertTrue(result is Sara.PermissionResult.Interrupted)
-    }
-
-    private object NoOpLogger : Logger {
-        override fun debug(message: String) {}
-        override fun info(message: String) {}
-        override fun warn(message: String) {}
-        override fun error(message: String) {}
     }
 }
 

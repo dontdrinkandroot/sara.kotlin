@@ -20,6 +20,15 @@ interface ToolExecutor {
         get() = false
 
     /**
+     * Whether this tool is available in PLAN MODE.
+     *
+     * Tools that can modify the system (e.g. `write_file`) should override this to false
+     * so they are excluded from the tool list sent to the LLM in plan mode. Defaults to true.
+     */
+    val availableInPlanMode: Boolean
+        get() = true
+
+    /**
      * Returns the function schema for this tool to be sent to the LLM.
      */
     fun getFunctionDescription(): FunctionDescription

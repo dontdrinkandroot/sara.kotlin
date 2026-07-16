@@ -3,7 +3,6 @@ package net.dontdrinkandroot.sara
 import com.github.ajalt.mordant.terminal.Terminal
 import kotlinx.serialization.json.JsonObject
 import net.dontdrinkandroot.sara.configuration.Configuration
-import net.dontdrinkandroot.sara.logger.Logger
 import net.dontdrinkandroot.sara.systemprompt.SystemPromptProvider
 import net.dontdrinkandroot.sara.tool.ToolExecutor
 import net.dontdrinkandroot.sara.tool.ToolRegistry
@@ -105,13 +104,6 @@ class SaraToolPermissionTest {
             "Error: Tool execution denied by user",
             sara.buildDenialMessage("   ")
         )
-    }
-
-    private object NoOpLogger : Logger {
-        override fun debug(message: String) {}
-        override fun info(message: String) {}
-        override fun warn(message: String) {}
-        override fun error(message: String) {}
     }
 
     private class FakeTool(

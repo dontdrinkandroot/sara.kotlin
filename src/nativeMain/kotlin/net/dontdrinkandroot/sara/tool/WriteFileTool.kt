@@ -19,6 +19,7 @@ import platform.posix.fwrite
 class WriteFileTool : ToolExecutor {
     override val name: String = "write_file"
     override val description: String = "Write content to a file (overwrites if it exists)"
+    override val availableInPlanMode: Boolean = false
 
     override fun getFunctionDescription(): FunctionDescription {
         return FunctionDescription(
