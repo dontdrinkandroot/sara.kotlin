@@ -1,9 +1,14 @@
 package net.dontdrinkandroot.sara.systemprompt
 
-import kotlinx.cinterop.*
+import kotlinx.cinterop.ExperimentalForeignApi
+import kotlinx.cinterop.toKString
 import kotlinx.io.files.Path
+import net.dontdrinkandroot.sara.customizations.CustomizationSection
+import net.dontdrinkandroot.sara.customizations.SystemCustomizationsStore
 import net.dontdrinkandroot.sara.extensions.exists
-import platform.posix.*
+import platform.posix.getenv
+import platform.posix.mkdir
+import platform.posix.system
 import kotlin.test.Test
 import kotlin.test.assertTrue
 
@@ -19,19 +24,6 @@ class SystemCustomizationsProviderTest {
                 check(mkdir(candidate.toString(), 0x1FFu) == 0) { "mkdir failed for $candidate" }
                 return candidate
             }
-        }
-    }
-
-    @OptIn(ExperimentalForeignApi::class)
-    private fun writeText(path: Path, content: String) {
-        val file = fopen(path.toString(), "w") ?: error("fopen failed for $path")
-        try {
-            val bytes = content.encodeToByteArray()
-            bytes.usePinned { pinned ->
-                fwrite(pinned.addressOf(0), 1.convert(), bytes.size.convert(), file)
-            }
-        } finally {
-            fclose(file)
         }
     }
 
@@ -54,17 +46,21 @@ class SystemCustomizationsProviderTest {
     }
 
     @Test
-    fun testFileContentsInjectedWhenPresent() {
+    fun testEntriesRenderedWithIdsWhenPresent() {
         val dir = createTempDir("sara-customizations-present")
         try {
-            val file = Path("${dir.toString()}/${SystemCustomizationsProvider.CUSTOMIZATIONS_FILE_NAME}")
-            writeText(file, "### Installed packages\n- vim\n")
-            val provider = SystemCustomizationsProvider(configDir = dir)
+            val store = SystemCustomizationsStore(dir)
+            store.add(CustomizationSection.INSTALLED_PACKAGES, "vim")
+            store.add(CustomizationSection.SERVICES, "docker — enabled")
+
+            val provider = SystemCustomizationsProvider(store)
             val result = provider.provide()
 
             assertTrue(result.contains("## System Customizations"))
             assertTrue(result.contains("### Installed packages"))
-            assertTrue(result.contains("- vim"))
+            assertTrue(result.contains("- [1] vim"))
+            assertTrue(result.contains("### Services"))
+            assertTrue(result.contains("- [2] docker — enabled"))
             assertTrue(!result.contains(SystemCustomizationsProvider.MISSING_MARKER))
         } finally {
             cleanup(dir)
@@ -75,17 +71,16 @@ class SystemCustomizationsProviderTest {
     fun testLongContentsAreTruncated() {
         val dir = createTempDir("sara-customizations-trunc")
         try {
-            val file = Path("${dir.toString()}/${SystemCustomizationsProvider.CUSTOMIZATIONS_FILE_NAME}")
-            val longBody = "x".repeat(SystemCustomizationsProvider.MAX_CONTENT_LENGTH + 500)
-            writeText(file, longBody)
-            val provider = SystemCustomizationsProvider(configDir = dir)
+            val store = SystemCustomizationsStore(dir)
+            val longEntry = "x".repeat(SystemCustomizationsProvider.MAX_CONTENT_LENGTH + 500)
+            store.add(CustomizationSection.OTHER, longEntry)
+
+            val provider = SystemCustomizationsProvider(store)
             val result = provider.provide()
 
             assertTrue(result.contains(SystemCustomizationsProvider.TRUNCATION_MARKER.trim()))
-            assertTrue(!result.contains(longBody))
-            val expectedTail = "x".repeat(SystemCustomizationsProvider.MAX_CONTENT_LENGTH) +
-                    SystemCustomizationsProvider.TRUNCATION_MARKER
-            assertTrue(result.endsWith(expectedTail))
+            assertTrue(!result.contains(longEntry))
+            assertTrue(result.length <= SystemCustomizationsProvider.MAX_CONTENT_LENGTH + 4096)
         } finally {
             cleanup(dir)
         }

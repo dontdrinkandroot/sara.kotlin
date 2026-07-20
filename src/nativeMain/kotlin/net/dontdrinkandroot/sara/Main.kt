@@ -4,6 +4,7 @@ import com.github.ajalt.mordant.terminal.Terminal
 import kotlinx.coroutines.runBlocking
 import net.dontdrinkandroot.sara.configuration.ConfigurationError
 import net.dontdrinkandroot.sara.configuration.loadConfiguration
+import net.dontdrinkandroot.sara.customizations.SystemCustomizationsStore
 import net.dontdrinkandroot.sara.logger.ConsoleLogger
 import net.dontdrinkandroot.sara.logger.LogLevel
 import net.dontdrinkandroot.sara.systemprompt.ChainedSystemPromptProvider
@@ -37,6 +38,10 @@ fun main(args: Array<String>) {
     toolRegistry.register(ExecCommandTool())
     toolRegistry.register(ReadFileTool())
     toolRegistry.register(WriteFileTool())
+    val customizationsStore = SystemCustomizationsStore()
+    toolRegistry.register(AddCustomizationTool(customizationsStore))
+    toolRegistry.register(RemoveCustomizationTool(customizationsStore))
+    toolRegistry.register(ReplaceCustomizationTool(customizationsStore))
     val webFetchClient = WebFetchClient()
     toolRegistry.register(WebFetchTool(webFetchClient))
 
@@ -56,7 +61,7 @@ fun main(args: Array<String>) {
     val systemPromptProvider = ChainedSystemPromptProvider(
         listOf(
             SaraSystemPromptProvider(),
-            SystemCustomizationsProvider(),
+            SystemCustomizationsProvider(customizationsStore),
             StaticSystemPromptProvider(configuration.systemPrompt),
             SystemInformationSystemPromptProvider()
         ),

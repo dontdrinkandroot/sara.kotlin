@@ -152,21 +152,32 @@ The config directory resolver is the shared `defaultConfigDir()` helper in `conf
 
 ### System Customizations Log
 
-SARA proactively maintains `~/.config/sara/system-customizations.md` as a curated, refactorable state document
+SARA proactively maintains `~/.config/sara/system-customizations.json` as a curated, refactorable state document
 describing how the system deviates from a default installation. It is **NOT** an append-only log: entries are added when
 a change is made and deleted/updated when reverted, so the file always reflects the CURRENT state.
 
-- Sections: `### Installed packages`, `### Removed/purged packages`, `### Configuration files`, `### Services`,
-  `### Users and groups`, `### Scheduled tasks`, `### Other`.
-- Entries are concise and factual (package name, config path + one-line description, service name + desired state);
-  no timestamps, narration, or command transcripts.
-- SARA creates the file/`~/.config/sara/` (`mkdir -p`) on first change. Only genuine deviations are recorded; read-only
-  inspection commands and transient state are never logged.
-- The file’s current contents are injected into the system prompt at session start by `SystemCustomizationsProvider`
-  (truncated to ~10000 chars with `...[truncated]` to protect the context window), so the agent reconciles against the
-  latest baseline before making further changes.
+- Storage is pretty-printed JSON with the 7 fixed sections as top-level keys (`installedPackages`, `removedPackages`,
+  `configurationFiles`, `services`, `usersAndGroups`, `scheduledTasks`, `other`), each holding `{id, entry}` objects,
+  plus a `nextId` counter. Entries are addressed by stable sequential integer IDs.
+- The agent never edits the file manually. Three dedicated tools (all `isSafe = true`, exec mode only) mutate it via
+  `SystemCustomizationsStore`:
+  - `add_customization(section, entry)` — idempotent (case-insensitive trimmed dedupe per section), returns the assigned
+    ID.
+  - `remove_customization(id)` — removes by ID (used when a change is reverted).
+  - `replace_customization(id, entry)` — atomic text update, keeps the ID.
+  - Every mutation result includes the full freshly rendered state so the agent always has current IDs.
+- Entries are concise and factual (package name, config path + one-line description, service name + desired state); no
+  timestamps, narration, or command transcripts. Only genuine deviations are recorded; read-only inspection commands and
+  transient state are never logged.
+- The store creates the file/`~/.config/sara/` on first write, tolerates missing/corrupt files (falls back to empty
+  state), and repairs entries with missing/duplicate IDs on load.
+- The file's current contents are injected into the system prompt at session start by `SystemCustomizationsProvider`,
+  rendered as `### <Section>` / `- [<id>] <entry>` (empty sections omitted, truncated to ~10000 chars with
+  `...[truncated]`), so the agent reconciles against the latest baseline and can address entries by ID.
 
-Implementation: `systemprompt/SystemCustomizationsProvider.kt`.
+Implementation: `customizations/CustomizationSection.kt` (7-section enum), `customizations/Customizations.kt`
+(serializable model + render), `customizations/SystemCustomizationsStore.kt`,
+`tool/{Add,Remove,Replace}CustomizationTool.kt`, `systemprompt/SystemCustomizationsProvider.kt`.
 
 ### CLI Interaction
 
@@ -208,13 +219,16 @@ Switching:
 
 Tool availability per mode:
 
-| Tool           | exec | plan   |
-|----------------|------|--------|
-| `exec_command` | yes  | yes    |
-| `read_file`    | yes  | yes    |
-| `write_file`   | yes  | **no** |
-| `web_fetch`    | yes  | yes    |
-| `web_search`   | yes  | yes    |
+| Tool                    | exec | plan   |
+|-------------------------|------|--------|
+| `exec_command`          | yes  | yes    |
+| `read_file`             | yes  | yes    |
+| `write_file`            | yes  | **no** |
+| `web_fetch`             | yes  | yes    |
+| `web_search`            | yes  | yes    |
+| `add_customization`     | yes  | **no** |
+| `remove_customization`  | yes  | **no** |
+| `replace_customization` | yes  | **no** |
 
 Each `ToolExecutor` declares `val availableInPlanMode: Boolean` (default `true`). Tools that
 can modify the system (e.g. `write_file`) override this to `false`. The `ToolRegistry.getToolSchemas`
@@ -256,6 +270,8 @@ information).
   - `write_file` — write content to a file by path. **unsafe** (always prompts).
   - `web_fetch` — fetch a web page and return its content as Markdown, text, or HTML (always registered). **safe**.
   - `web_search` — search the web via Searxng (only registered when `SARA_SEARXNG_URL` is set). **safe**.
+  - `add_customization` / `remove_customization` / `replace_customization` — maintain the system customizations record
+    (see System Customizations Log above) by section/ID. **safe** (no prompt), exec mode only.
   - The persona (`SaraSystemPromptProvider`) explicitly encourages eager use of these web
     tools for unfamiliar or version-specific topics, while skipping them for stable,
     well-known facts or when the local system already provides the answer.

@@ -1,17 +1,10 @@
 package net.dontdrinkandroot.sara.tool
 
-import kotlinx.cinterop.ExperimentalForeignApi
-import kotlinx.cinterop.addressOf
-import kotlinx.cinterop.convert
-import kotlinx.cinterop.usePinned
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonPrimitive
 import net.dontdrinkandroot.sara.FunctionDescription
-import platform.posix.fclose
-import platform.posix.fflush
-import platform.posix.fopen
-import platform.posix.fwrite
+import net.dontdrinkandroot.sara.extensions.writeWholeFile
 
 /**
  * Tool for writing a string into a file (overwrites existing content or creates the file).
@@ -53,27 +46,10 @@ class WriteFileTool : ToolExecutor {
 
         return try {
             if (verbose) println("[sara] Writing file: $path (${content.length} chars)")
-            val written = writeWholeFile(path, content)
-            ToolResult.Success("Wrote $written bytes to $path")
+            writeWholeFile(path, content)
+            ToolResult.Success("Wrote ${content.encodeToByteArray().size} bytes to $path")
         } catch (e: Exception) {
             ToolResult.Error("Failed to write file '$path': ${e.message}")
-        }
-    }
-
-    @OptIn(ExperimentalForeignApi::class)
-    private fun writeWholeFile(path: String, content: String): Long {
-        val file = fopen(path, "w") ?: throw RuntimeException("Unable to open file for writing")
-        try {
-            var totalWritten = 0L
-            val bytes = content.encodeToByteArray()
-            bytes.usePinned { pinned ->
-                val written = fwrite(pinned.addressOf(0), 1.convert(), bytes.size.convert(), file)
-                totalWritten += written.toLong()
-            }
-            if (fflush(file) != 0) throw RuntimeException("Failed to flush file buffer")
-            return totalWritten
-        } finally {
-            fclose(file)
         }
     }
 }

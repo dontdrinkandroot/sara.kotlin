@@ -11,10 +11,14 @@ interface ToolExecutor {
     val description: String
 
     /**
-     * Whether this tool is safe to execute without explicit user confirmation.
+     * Whether this tool can be executed without explicit user confirmation.
      *
-     * Safe tools (read-only, side-effect-free) bypass the permission prompt even when brave mode
-     * is disabled. Unsafe tools always prompt unless brave mode is on. Defaults to false.
+     * A tool is "safe" when it does not alter the system state or the user configuration —
+     * i.e. it only reads or has side effects confined to SARA's own bookkeeping (e.g.
+     * `add_customization` only writes to SARA's own config file). Safe tools bypass the
+     * permission prompt even when brave mode is disabled. Tools that mutate system state
+     * or write to user-controlled paths (e.g. `write_file`, `exec_command`) override this
+     * to false so they always prompt unless brave mode is on. Defaults to false.
      */
     val isSafe: Boolean
         get() = false

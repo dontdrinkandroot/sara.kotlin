@@ -52,8 +52,9 @@ Optional values:
 Optional files:
 
 - `~/.config/sara/system-prompt.md` – custom system prompt prepended to each session (absence is not an error).
-- `~/.config/sara/system-customizations.md` – curated state document SARA maintains automatically to track how the
-  system deviates from a default installation. Its contents are injected into the system prompt at session start.
+- `~/.config/sara/system-customizations.json` – curated, JSON-formatted record SARA maintains automatically (via the
+  `add_customization` / `remove_customization` / `replace_customization` tools) to track how the system deviates from a
+  default installation. Its contents are injected into the system prompt at session start.
 
 Example `.env` (`~/.config/sara/.env`):
 
@@ -112,6 +113,8 @@ SARA exposes the following tools to the LLM:
 - `write_file` – write content to a file by path. **unsafe** (always prompts unless brave mode is on).
 - `web_fetch` – fetch a web page and return it as Markdown, text, or HTML (always registered). **safe**.
 - `web_search` – search the web via Searxng (only registered when `SARA_SEARXNG_URL` is set). **safe**.
+- `add_customization` / `remove_customization` / `replace_customization` – maintain the system customizations record
+  (`~/.config/sara/system-customizations.json`) by entry ID. **safe** (no prompt), exec mode only.
 
 Safe (read-only, side-effect-free) tools bypass the confirmation prompt even when brave mode is off. Unsafe tools always
 prompt unless brave mode is on. When you decline a prompted tool, you may optionally provide a reason that is sent back
@@ -151,7 +154,7 @@ Depending on the target, the binary may be named `sara` or `sara.kexe`.
     - `~/.config/sara/.env`
     - `~/.config/sara/.env.local`
     - Default system prompt file: `~/.config/sara/system-prompt.md`
-  - Auto-maintained customizations file: `~/.config/sara/system-customizations.md`
+  - Auto-maintained customizations file: `~/.config/sara/system-customizations.json`
 
 #### License
 
