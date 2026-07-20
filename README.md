@@ -115,7 +115,8 @@ SARA exposes the following tools to the LLM:
 
 Safe (read-only, side-effect-free) tools bypass the confirmation prompt even when brave mode is off. Unsafe tools always
 prompt unless brave mode is on. When you decline a prompted tool, you may optionally provide a reason that is sent back
-to the LLM.
+to the LLM. Tools that execute without a prompt (brave mode or safe tools) are announced with a compact one-line notice
+including the tool name and truncated arguments, so tool usage always stays transparent.
 
 #### Build from source (optional)
 

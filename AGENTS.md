@@ -261,6 +261,11 @@ information).
     well-known facts or when the local system already provides the answer.
 - Each `ToolExecutor` declares `val isSafe: Boolean` (default `false`). Safe tools (read-only, side-effect-free)
   bypass the confirmation prompt even when brave mode is off. Unsafe tools always prompt unless brave mode is on.
+- Tool calls executed without a prompt (brave mode or safe tools) are announced in the terminal with a compact yellow
+  one-liner (`[sara] Executing tool '<name>': <args>`), with arguments truncated to ~120 characters, so tool usage stays
+  transparent. Implementation: `Sara.announceToolExecution` (called from
+  `checkToolPermission`) and the pure `internal fun formatToolAnnouncement` in `Sara.kt` (tested in
+  `ToolAnnouncementTest`).
 - Each `ToolExecutor` also declares `val availableInPlanMode: Boolean` (default `true`). Tools that can modify the
   system (e.g. `write_file`) override this to `false` so they are excluded in plan mode.
 - When a tool is prompted and the user declines, the user may optionally provide a reason (press Enter to omit).

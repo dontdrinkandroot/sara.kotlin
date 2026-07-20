@@ -286,15 +286,21 @@ class Sara(
     internal fun checkToolPermission(tool: ToolExecutor, toolArgs: String): PermissionResult {
         if (configuration.braveMode) {
             logger.debug("Brave mode enabled: executing tool '${tool.name}' without confirmation")
+            announceToolExecution(tool, toolArgs)
             return PermissionResult.Allowed
         }
 
         if (tool.isSafe) {
             logger.debug("Tool '${tool.name}' is safe: executing without confirmation")
+            announceToolExecution(tool, toolArgs)
             return PermissionResult.Allowed
         }
 
         return askForToolPermission(tool.name, toolArgs)
+    }
+
+    private fun announceToolExecution(tool: ToolExecutor, toolArgs: String) {
+        terminal.println(yellow("[sara] ${formatToolAnnouncement(tool.name, toolArgs)}"))
     }
 
     internal fun buildDenialMessage(reason: String?): String {
@@ -400,4 +406,22 @@ class Sara(
         terminal.println()
         return PermissionResult.Denied(reason)
     }
+}
+
+/**
+ * Formats a compact one-line announcement for a tool that is executed without a
+ * confirmation prompt (brave mode or safe tools). Arguments are truncated to
+ * [maxLength] characters to keep the terminal output readable.
+ */
+internal fun formatToolAnnouncement(toolName: String, toolArgs: String, maxLength: Int = 120): String {
+    val trimmedArgs = toolArgs.trim()
+    if (trimmedArgs.isEmpty()) {
+        return "Executing tool '$toolName'"
+    }
+    val displayArgs = if (trimmedArgs.length > maxLength) {
+        "${trimmedArgs.take(maxLength)}..."
+    } else {
+        trimmedArgs
+    }
+    return "Executing tool '$toolName': $displayArgs"
 }
