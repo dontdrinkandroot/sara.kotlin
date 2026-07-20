@@ -320,6 +320,13 @@ with a `...[truncated]` marker.
 Implementation: `WebFetchClient` (ktor HTTP GET), `HtmlToMarkdown` (Ksoup DOM → Markdown converter, unit-testable
 without network), `WebFetchTool` (tool executor).
 
+## Backlog
+
+`BACKLOG.md` at the repo root lists known bugs, improvement areas, and feature options,
+grouped by category and ordered by priority within each section. Check it before starting
+a change; when an item is resolved, remove it from `BACKLOG.md` and update this file if
+the behavior changed.
+
 ## Self-Update Instruction
 
 This guidelines file is a living document and MUST be actively maintained by the LLM Agent.
