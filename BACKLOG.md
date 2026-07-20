@@ -9,12 +9,6 @@ heading too. Origin: technical/domain review of 2026-07-20.
 
 ### Conversation integrity
 
-- **Dangling `tool_calls` on interrupt** (`Sara.processToolCalls`): the assistant message
-  carrying `tool_calls` is appended to `messages` before the tools execute. If Ctrl+C
-  cancels mid-loop, the conversation ends with unanswered tool calls, and most
-  OpenAI-compatible APIs reject the next request with a 400. Fix: on cancellation, either
-  append synthetic `tool` results for all unanswered calls or roll back the partial
-  assistant message.
 - **Silent drop of reasoning-only responses** (`Sara.displayAssistantMessage`): when the
   model returns neither content nor tool calls (e.g. reasoning-only, or truncated with
   `finish_reason: length`), the turn just ends with a debug log — the user sees nothing

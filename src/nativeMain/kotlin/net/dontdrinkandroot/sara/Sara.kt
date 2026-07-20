@@ -220,12 +220,31 @@ class Sara(
         toolCalls != null && toolCalls.isNotEmpty()
 
     private suspend fun processToolCalls(message: Message, messages: MutableList<Message>) {
-        logger.debug("Model requested ${message.toolCalls!!.size} tool call(s)")
+        val toolCalls = message.toolCalls!!
+        logger.debug("Model requested ${toolCalls.size} tool call(s)")
         messages.add(message)
 
-        for (toolCall in message.toolCalls) {
-            coroutineContext.ensureActive()
-            executeToolCall(toolCall, messages)
+        val answeredToolCallIds = mutableSetOf<String>()
+        try {
+            for (toolCall in toolCalls) {
+                coroutineContext.ensureActive()
+                executeToolCall(toolCall, messages)
+                answeredToolCallIds.add(toolCall.id)
+            }
+        } catch (e: CancellationException) {
+            withContext(NonCancellable) {
+                toolCalls
+                    .filter { it.id !in answeredToolCallIds }
+                    .forEach { toolCall ->
+                        addToolErrorMessage(
+                            toolCall,
+                            toolCall.function.name,
+                            "Error: Tool execution interrupted by user (Ctrl+C)",
+                            messages
+                        )
+                    }
+            }
+            throw e
         }
     }
 
@@ -294,6 +313,8 @@ class Sara(
                 ?: kotlinx.serialization.json.JsonObject(emptyMap())
 
             tool.execute(argsJson, configuration.verbose)
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             logger.error("Tool execution error: ${e.message}")
             ToolResult.Error("Failed to execute tool: ${e.message}")

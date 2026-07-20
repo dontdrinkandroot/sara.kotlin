@@ -176,7 +176,10 @@ Implementation: `systemprompt/SystemCustomizationsProvider.kt`.
   returns to the prompt. A second Ctrl+C force-exits the process (safety net for stuck blocking calls).
   At the prompt, Ctrl+C exits the program (same as Ctrl+D).
 - When a turn is interrupted, a system message (`"The user interrupted this turn. Stop and wait for the next user
-  message."`) is appended to the conversation so the LLM reconciles the partial state.
+  message."`) is appended to the conversation so the LLM reconciles the partial state. If the interrupt happens during
+  tool-call processing, every unanswered tool call additionally receives a synthetic `tool` result
+  (`"Error: Tool execution interrupted by user (Ctrl+C)"`) so no dangling `tool_calls` remain that would make the next
+  API request fail with a 400 (see `Sara.processToolCalls`).
 - The SIGINT handler is installed via `SignalInterruptSource` (POSIX `signal()`). The `InterruptSource` interface
   is injected into `Sara` for testability (tests use `FakeInterruptSource`).
 - Verbose mode (-v/--verbose) prints a short REPL start hint.
