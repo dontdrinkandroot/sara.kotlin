@@ -17,7 +17,7 @@ fun SystemPromptProvider.safeProvide(): String? = try {
     null
 }
 
-class ChainedSystemPromptProvider(
+open class ChainedSystemPromptProvider(
     private val providers: List<SystemPromptProvider>,
     private val separator: String = ""
 ) : SystemPromptProvider {

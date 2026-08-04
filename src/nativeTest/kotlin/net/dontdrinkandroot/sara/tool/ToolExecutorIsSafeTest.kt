@@ -1,6 +1,7 @@
 package net.dontdrinkandroot.sara.tool
 
 import kotlinx.serialization.json.JsonObject
+import net.dontdrinkandroot.sara.ExaClient
 import net.dontdrinkandroot.sara.FunctionDescription
 import net.dontdrinkandroot.sara.SearxngClient
 import net.dontdrinkandroot.sara.WebFetchClient
@@ -40,6 +41,16 @@ class ToolExecutorIsSafeTest {
     @Test
     fun webSearchToolIsSafe() {
         assertTrue(WebSearchTool(SearxngClient("http://localhost:8080")).isSafe)
+    }
+
+    @Test
+    fun exaSearchToolIsSafe() {
+        assertTrue(ExaSearchTool(ExaClient("unit-test-key")).isSafe)
+    }
+
+    @Test
+    fun exaContentsToolIsSafe() {
+        assertTrue(ExaContentsTool(ExaClient("unit-test-key")).isSafe)
     }
 
     @Test

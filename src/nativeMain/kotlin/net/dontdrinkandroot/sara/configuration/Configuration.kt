@@ -28,6 +28,7 @@ data class Configuration(
     val baseUrl: String,
     val searxngUrl: String? = null,
     val searxngToken: String? = null,
+    val exaApiKey: String? = null,
     val verbose: Boolean = false,
     val systemPrompt: String?,
     val braveMode: Boolean = false,
@@ -123,6 +124,7 @@ private fun buildConfiguration(
 
     val searxngUrl = env["SARA_SEARXNG_URL"]?.takeIf(String::isNotBlank)
     val searxngToken = env["SARA_SEARXNG_TOKEN"]?.takeIf(String::isNotBlank)
+    val exaApiKey = env["SARA_EXA_API_KEY"]?.takeIf(String::isNotBlank)
 
     val systemPromptPath: Path = when (val cliPath = systemPromptFile) {
         null -> configDir.appendFileName("system-prompt.md")
@@ -136,6 +138,7 @@ private fun buildConfiguration(
         baseUrl = requireNotNull(baseUrl),
         searxngUrl = searxngUrl,
         searxngToken = searxngToken,
+        exaApiKey = exaApiKey,
         verbose = verbose,
         systemPrompt = systemPrompt,
         braveMode = braveMode,

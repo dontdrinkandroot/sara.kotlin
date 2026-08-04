@@ -20,7 +20,8 @@
   * There is a `.env` file in the directory that provides the `SARA_API_KEY` variable (bearer to interact with the
     LLM Provider), the `SARA_MODEL` variable (which model to use), and the required `SARA_BASE_URL` variable that
     points to the OpenAI-compatible API base (without the trailing path). Optional: `SARA_SEARXNG_URL` and
-    `SARA_SEARXNG_TOKEN` for web search (see Web Search below).
+    `SARA_SEARXNG_TOKEN` for Searxng web search (see Web Search below), and `SARA_EXA_API_KEY` for the Exa web search &
+    contents tools (see Exa Web Search & Contents below).
     * There is an optional `system-prompt.md` file that contains a System Prompt which is prepended to each session.
 
 ## Build
@@ -73,6 +74,8 @@ Optional variables:
   `${SARA_SEARXNG_URL}/search?format=json`.
 - `SARA_SEARXNG_TOKEN` — optional bearer token sent as `Authorization: Bearer <token>` to the Searxng instance. Ignored
   if `SARA_SEARXNG_URL` is not set.
+- `SARA_EXA_API_KEY` — Exa API key. When set, SARA registers the `exa_search` and `exa_contents` tools backed by the Exa
+  Search/Contents APIs (see Exa Web Search & Contents below).
 
 Provider base URL examples for `.env`:
 
@@ -95,6 +98,9 @@ SARA_API_KEY=sk-or-...
 # Searxng (optional web search)
 # SARA_SEARXNG_URL=http://localhost:8080
 # SARA_SEARXNG_TOKEN=optional-bearer-token
+
+# Exa (optional web search & contents; https://exa.ai)
+# SARA_EXA_API_KEY=your-exa-api-key
 ```
 
 System prompt handling:
@@ -120,10 +126,14 @@ only the automatic sections are used.
 
 The assembled system prompt is built by `ChainedSystemPromptProvider` in `Main.kt` from four providers in this order:
 
-1. `SaraSystemPromptProvider` — built-in persona ("You are Sara…") plus a `## Web tool usage`
-   section that nudges the agent to prefer `web_search`/`web_fetch` for unfamiliar,
-   fast-moving, or version-specific topics (and to skip them for stable, well-known facts
-   or when the answer is already available locally).
+1. `SaraSystemPromptProvider` — built-in persona, composed via a `ChainedSystemPromptProvider`
+   of per-section providers in the `systemprompt.sections` subpackage (`AboutSystemPromptProvider`,
+   `SensitiveDataPolicySystemPromptProvider`, `ModesSystemPromptProvider`, and the dynamic
+   `WebToolUsageSystemPromptProvider`). The `## Web tool usage` section is generated from the tools that are actually
+   registered: it nudges the agent to prefer the available web tools (`web_search`/`web_fetch` and/or `exa_search`/
+   `exa_contents`) for unfamiliar, fast-moving, or version-specific topics (and to skip them for stable, well-known
+   facts or when the answer is already available locally), preferring Exa tools over `web_search` when both are present.
+   It is omitted entirely when no web tools are available.
 2. `SystemCustomizationsProvider` — System Customizations Log (see below).
 3. `StaticSystemPromptProvider(configuration.systemPrompt)` — the user’s `system-prompt.md` (skipped if absent/empty).
 4. `SystemInformationSystemPromptProvider` — a `## System Information` block made of the sections below, assembled via
@@ -268,13 +278,19 @@ information).
     marker is appended so the agent can paginate by setting `offset` to the next offset. If `offset` is at or beyond
     the end of file, a `[offset <N> is at or beyond end of file (<total> characters)]` footer is returned instead.
   - `write_file` — write content to a file by path. **unsafe** (always prompts).
-  - `web_fetch` — fetch a web page and return its content as Markdown, text, or HTML (always registered). **safe**.
+  - `web_fetch` — fetch a web page and return its content as Markdown, text, or HTML (registered unless
+    `SARA_EXA_API_KEY` is set, which disables it in favor of `exa_contents`). **safe**.
   - `web_search` — search the web via Searxng (only registered when `SARA_SEARXNG_URL` is set). **safe**.
+  - `exa_search` — search the web via Exa and return ranked results with highlights (only registered when
+    `SARA_EXA_API_KEY` is set). **safe**.
+  - `exa_contents` — extract clean, LLM-ready content from a web page via Exa (only registered when
+    `SARA_EXA_API_KEY` is set). **safe**.
   - `add_customization` / `remove_customization` / `replace_customization` — maintain the system customizations record
     (see System Customizations Log above) by section/ID. **safe** (no prompt), exec mode only.
-  - The persona (`SaraSystemPromptProvider`) explicitly encourages eager use of these web
-    tools for unfamiliar or version-specific topics, while skipping them for stable,
-    well-known facts or when the local system already provides the answer.
+  - The persona (`SaraSystemPromptProvider`) explicitly encourages eager use of the available web
+    tools for unfamiliar or version-specific topics, while skipping them for stable, well-known facts or when the local
+    system already provides the answer, and prefers
+    `exa_search`/`exa_contents` over `web_search` when they are available.
 - Each `ToolExecutor` declares `val isSafe: Boolean` (default `false`). Safe tools (read-only, side-effect-free)
   bypass the confirmation prompt even when brave mode is off. Unsafe tools always prompt unless brave mode is on.
 - Tool calls executed without a prompt (brave mode or safe tools) are announced in the terminal with a compact yellow
@@ -308,7 +324,8 @@ information).
 
 ### Sensitive Data Policy
 
-- `SaraSystemPromptProvider` injects a "Sensitive data policy" section into the system prompt that forbids SARA from
+- `SensitiveDataPolicySystemPromptProvider` (a section of `SaraSystemPromptProvider`) injects a
+  "Sensitive data policy" section into the system prompt that forbids SARA from
   reading, displaying, printing, transmitting, or exfiltrating private/secret material under any circumstances.
 - Forbidden examples: `/etc/shadow`, SSH private keys, GPG private keys, cloud/SDK credentials.
 - This is the soft guardrail that complements `read_file` being marked `isSafe = true` (executed without confirmation).
@@ -321,9 +338,26 @@ calls `${SARA_SEARXNG_URL}/search?format=json&q=<query>` and returns all results
 as `Title`/`URL`/`Snippet` blocks. An optional bearer token can be supplied via `SARA_SEARXNG_TOKEN`. The previous
 OpenRouter `web` plugin path has been removed.
 
+### Exa Web Search & Contents
+
+When `SARA_EXA_API_KEY` is set, SARA registers two tools backed by the Exa Search/Contents APIs (https://exa.ai):
+
+- `exa_search` — POSTs `${EXA_BASE_URL}/search` with an `Authorization: Bearer <apiKey>` header and the query in
+  `highlights` mode (the content mode Exa recommends for agent workflows), returning ranked `Title`/`URL`/
+  `Published`/`Highlight` blocks. `num_results` defaults to 10.
+- `exa_contents` — POSTs `${EXA_BASE_URL}/contents` for a single URL and returns the clean markdown content of the page
+  (`URL`/`Title` headers, then the extracted text), truncated at `max_length` (default 50000) with a
+  `...[truncated]` marker. Exa handles JavaScript-rendered pages, PDFs, and complex layouts.
+
+Both tools are `isSafe = true`. Implementation: `ExaClient` (ktor), `ExaSearchTool`, `ExaContentsTool`, with
+serialization covered by `ExaSerializationTest` and safe-ness asserted in `ToolExecutorIsSafeTest`. The persona prefers
+these tools over `web_search` when `SARA_EXA_API_KEY` is set. When Exa is enabled, `web_fetch` is **not**
+registered (its role is taken over by `exa_contents`); Searxng's `web_search` may still coexist with Exa.
+
 ### Web Fetch
 
-SARA always registers a `web_fetch` tool (no configuration required). It fetches the content of a web page via HTTP
+SARA registers a `web_fetch` tool by default (no configuration required), unless `SARA_EXA_API_KEY` is set (in which
+case `exa_contents` covers page fetching). It fetches the content of a web page via HTTP
 and returns it to the LLM in a specified format. The tool uses a realistic browser User-Agent to avoid being blocked
 by common sites.
 

@@ -14,7 +14,11 @@ class SystemPromptDumpTest {
     fun dumpSystemPrompt() {
         val provider = ChainedSystemPromptProvider(
             listOf(
-                SaraSystemPromptProvider(),
+                SaraSystemPromptProvider(
+                    webFetchEnabled = true,
+                    webSearchEnabled = false,
+                    exaEnabled = false,
+                ),
                 SystemCustomizationsProvider(),
                 SystemInformationSystemPromptProvider()
             ),

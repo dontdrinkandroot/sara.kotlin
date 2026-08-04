@@ -7,7 +7,8 @@ prompt, and automatic injection of useful system context.
 - Runs as a single native executable (no JVM required)
 - Targets Linux (x64)
 - Renders LLM responses as Markdown in the terminal
-- Supports tool calling (`exec_command`, `read_file`, `write_file`, `web_fetch`, and optional `web_search`)
+- Supports tool calling (`exec_command`, `read_file`, `write_file`, `web_fetch`, and optional `web_search` (Searxng)
+  / `exa_search` / `exa_contents` (Exa))
 
 #### Download
 
@@ -48,6 +49,8 @@ Optional values:
   `${SARA_SEARXNG_URL}/search?format=json`.
 - `SARA_SEARXNG_TOKEN` – optional bearer token sent as `Authorization: Bearer <token>` to the Searxng instance. Ignored
   if `SARA_SEARXNG_URL` is not set.
+- `SARA_EXA_API_KEY` – Exa API key. When set, SARA registers the `exa_search` and `exa_contents` tools backed by the Exa
+  Search/Contents APIs (https://exa.ai).
 
 Optional files:
 
@@ -72,6 +75,9 @@ SARA_API_KEY=sk-or-...
 # Optional Searxng (enables the web_search tool)
 # SARA_SEARXNG_URL=http://localhost:8080
 # SARA_SEARXNG_TOKEN=optional-bearer-token
+
+# Optional Exa (enables the exa_search and exa_contents tools; https://exa.ai)
+# SARA_EXA_API_KEY=your-exa-api-key
 ```
 
 You can also provide `~/.config/sara/.env.local` for local overrides; its entries take precedence over `.env`.
@@ -113,6 +119,10 @@ SARA exposes the following tools to the LLM:
 - `write_file` – write content to a file by path. **unsafe** (always prompts unless brave mode is on).
 - `web_fetch` – fetch a web page and return it as Markdown, text, or HTML (always registered). **safe**.
 - `web_search` – search the web via Searxng (only registered when `SARA_SEARXNG_URL` is set). **safe**.
+- `exa_search` – search the web via Exa and return ranked results with highlights (only registered when
+  `SARA_EXA_API_KEY` is set). **safe**.
+- `exa_contents` – extract clean, LLM-ready content from a web page via Exa (only registered when `SARA_EXA_API_KEY`
+  is set). **safe**.
 - `add_customization` / `remove_customization` / `replace_customization` – maintain the system customizations record
   (`~/.config/sara/system-customizations.json`) by entry ID. **safe** (no prompt), exec mode only.
 
@@ -150,6 +160,7 @@ Depending on the target, the binary may be named `sara` or `sara.kexe`.
   - `SARA_BASE_URL` (required)
   - `SARA_SEARXNG_URL` (optional)
   - `SARA_SEARXNG_TOKEN` (optional)
+  - `SARA_EXA_API_KEY` (optional)
 - .env locations:
     - `~/.config/sara/.env`
     - `~/.config/sara/.env.local`

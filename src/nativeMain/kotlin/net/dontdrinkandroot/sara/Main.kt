@@ -30,7 +30,7 @@ fun main(args: Array<String>) {
     SignalInterruptSource.install()
 
     logger.debug("Config loaded")
-    logger.debug("searxngUrl=${configuration.searxngUrl}, verbose=${configuration.verbose}, braveMode=${configuration.braveMode}")
+    logger.debug("searxngUrl=${configuration.searxngUrl}, exaApiKey=${configuration.exaApiKey != null}, verbose=${configuration.verbose}, braveMode=${configuration.braveMode}")
     logger.debug("model=${configuration.model}")
     logger.debug("systemPromptLength=${configuration.systemPrompt?.length}")
 
@@ -42,12 +42,24 @@ fun main(args: Array<String>) {
     toolRegistry.register(AddCustomizationTool(customizationsStore))
     toolRegistry.register(RemoveCustomizationTool(customizationsStore))
     toolRegistry.register(ReplaceCustomizationTool(customizationsStore))
-    val webFetchClient = WebFetchClient()
-    toolRegistry.register(WebFetchTool(webFetchClient))
+    val webFetchClient: WebFetchClient? = if (configuration.exaApiKey == null) {
+        WebFetchClient().also {
+            toolRegistry.register(WebFetchTool(it))
+        }
+    } else {
+        null
+    }
 
     val searxngClient = configuration.searxngUrl?.let { url ->
         SearxngClient(url, configuration.searxngToken).also {
             toolRegistry.register(WebSearchTool(it))
+        }
+    }
+
+    val exaClient = configuration.exaApiKey?.let { apiKey ->
+        ExaClient(apiKey).also {
+            toolRegistry.register(ExaSearchTool(it))
+            toolRegistry.register(ExaContentsTool(it))
         }
     }
 
@@ -60,7 +72,11 @@ fun main(args: Array<String>) {
 
     val systemPromptProvider = ChainedSystemPromptProvider(
         listOf(
-            SaraSystemPromptProvider(),
+            SaraSystemPromptProvider(
+                webFetchEnabled = configuration.exaApiKey == null,
+                webSearchEnabled = configuration.searxngUrl != null,
+                exaEnabled = configuration.exaApiKey != null,
+            ),
             SystemCustomizationsProvider(customizationsStore),
             StaticSystemPromptProvider(configuration.systemPrompt),
             SystemInformationSystemPromptProvider()
@@ -81,8 +97,9 @@ fun main(args: Array<String>) {
         }
     } finally {
         llmClient.close()
-        webFetchClient.close()
+        webFetchClient?.close()
         searxngClient?.close()
+        exaClient?.close()
     }
 }
 
