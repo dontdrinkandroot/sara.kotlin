@@ -2,7 +2,9 @@ package net.dontdrinkandroot.sara.systemprompt
 
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.toKString
-import net.dontdrinkandroot.sara.systemprompt.systeminformation.SystemInformationSystemPromptProvider
+import net.dontdrinkandroot.sara.systemprompt.providers.InstructionsProvider
+import net.dontdrinkandroot.sara.systemprompt.providers.SystemCustomizationsProvider
+import net.dontdrinkandroot.sara.systemprompt.providers.systeminformation.SystemInformationProvider
 import platform.posix.getenv
 import kotlin.test.Test
 import kotlin.test.assertNotNull
@@ -14,13 +16,13 @@ class SystemPromptDumpTest {
     fun dumpSystemPrompt() {
         val provider = ChainedSystemPromptProvider(
             listOf(
-                SaraSystemPromptProvider(
+                InstructionsProvider(
                     webFetchEnabled = true,
                     webSearchEnabled = false,
                     exaEnabled = false,
                 ),
                 SystemCustomizationsProvider(),
-                SystemInformationSystemPromptProvider()
+                SystemInformationProvider()
             ),
             separator = "\n\n"
         )

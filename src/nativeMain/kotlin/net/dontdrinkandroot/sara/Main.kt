@@ -8,10 +8,10 @@ import net.dontdrinkandroot.sara.customizations.SystemCustomizationsStore
 import net.dontdrinkandroot.sara.logger.ConsoleLogger
 import net.dontdrinkandroot.sara.logger.LogLevel
 import net.dontdrinkandroot.sara.systemprompt.ChainedSystemPromptProvider
-import net.dontdrinkandroot.sara.systemprompt.SaraSystemPromptProvider
 import net.dontdrinkandroot.sara.systemprompt.StaticSystemPromptProvider
-import net.dontdrinkandroot.sara.systemprompt.SystemCustomizationsProvider
-import net.dontdrinkandroot.sara.systemprompt.systeminformation.SystemInformationSystemPromptProvider
+import net.dontdrinkandroot.sara.systemprompt.providers.InstructionsProvider
+import net.dontdrinkandroot.sara.systemprompt.providers.SystemCustomizationsProvider
+import net.dontdrinkandroot.sara.systemprompt.providers.systeminformation.SystemInformationProvider
 import net.dontdrinkandroot.sara.tool.*
 import kotlin.system.exitProcess
 
@@ -72,14 +72,14 @@ fun main(args: Array<String>) {
 
     val systemPromptProvider = ChainedSystemPromptProvider(
         listOf(
-            SaraSystemPromptProvider(
+            InstructionsProvider(
                 webFetchEnabled = configuration.exaApiKey == null,
                 webSearchEnabled = configuration.searxngUrl != null,
                 exaEnabled = configuration.exaApiKey != null,
             ),
             SystemCustomizationsProvider(customizationsStore),
             StaticSystemPromptProvider(configuration.systemPrompt),
-            SystemInformationSystemPromptProvider()
+            SystemInformationProvider()
         ),
         separator = "\n\n"
     )
@@ -102,4 +102,3 @@ fun main(args: Array<String>) {
         exaClient?.close()
     }
 }
-

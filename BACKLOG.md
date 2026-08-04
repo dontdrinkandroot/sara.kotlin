@@ -144,8 +144,7 @@ heading too. Origin: technical/domain review of 2026-07-20.
 - **Session persistence**: save/load conversations (`/save <name>`, `sara --resume`),
   stored under `~/.config/sara/sessions/`.
 - **More native tools**: `list_directory`, `grep`/`search_files`, `glob` — reduces
-  `exec_command` usage and improves safety, matching the persona's "prefer native tools"
-  rule.
+  `exec_command` usage and improves safety, matching the "prefer native tools" rule in the instructions.
 - **Technical enforcement of the sensitive-data policy**: path blocklist in `read_file`,
   URL/IP blocklist in `web_fetch` (see Security bugs above).
 

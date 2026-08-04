@@ -41,7 +41,7 @@ The assembled system prompt can be inspected locally by running the `SystemPromp
 ./gradlew nativeTest --tests "*.SystemPromptDumpTest.dumpSystemPrompt" --info
 ```
 
-The test prints the fully assembled system prompt (persona, customizations, and live system information) to stdout.
+The test prints the fully assembled system prompt (instructions, customizations, and live system information) to stdout.
 Gradle suppresses task stdout by default, so pass `--info` (or `--rerun-tasks --info` to force a fresh run) to actually
 see the `=== SYSTEM PROMPT START ===` ... `=== SYSTEM PROMPT END ===` block and the reported length in the build log.
 The test is skipped in CI (output suppressed when `CI=true`), but the assertions still execute to validate the
@@ -126,19 +126,19 @@ only the automatic sections are used.
 
 The assembled system prompt is built by `ChainedSystemPromptProvider` in `Main.kt` from four providers in this order:
 
-1. `SaraSystemPromptProvider` — built-in persona, composed via a `ChainedSystemPromptProvider`
-   of per-section providers in the `systemprompt.sections` subpackage (`AboutSystemPromptProvider`,
-   `SensitiveDataPolicySystemPromptProvider`, `ModesSystemPromptProvider`, and the dynamic
-   `WebToolUsageSystemPromptProvider`). The `## Web tool usage` section is generated from the tools that are actually
+1. `InstructionsProvider` — the built-in agent instructions, composed via a `ChainedSystemPromptProvider`
+   of the root-level `##` sections in the `systemprompt.providers` package (`AboutProvider`,
+   `SensitiveDataPolicyProvider`, `ModesProvider`, and the dynamic
+   `WebToolUsageProvider`). The `## Web tool usage` section is generated from the tools that are actually
    registered: it nudges the agent to prefer the available web tools (`web_search`/`web_fetch` and/or `exa_search`/
    `exa_contents`) for unfamiliar, fast-moving, or version-specific topics (and to skip them for stable, well-known
    facts or when the answer is already available locally), preferring Exa tools over `web_search` when both are present.
    It is omitted entirely when no web tools are available.
 2. `SystemCustomizationsProvider` — System Customizations Log (see below).
 3. `StaticSystemPromptProvider(configuration.systemPrompt)` — the user’s `system-prompt.md` (skipped if absent/empty).
-4. `SystemInformationSystemPromptProvider` — a `## System Information` block made of the sections below, assembled via
+4. `SystemInformationProvider` — a `## System Information` block made of the sections below, assembled via
    `ChainedSystemPromptProvider` (so per-leaf failures are isolated by `safeProvide()`). All providers live in the
-   `systemprompt.systeminformation` subpackage:
+   `systemprompt.providers.systeminformation` subpackage:
 
 - `### General` — one line per field: Date (`date -Is`), Distribution (`/etc/os-release`),
   Architecture (`uname -m`), Package manager (`command -v` probe in priority order: apt, dnf,
@@ -149,13 +149,19 @@ The assembled system prompt is built by `ChainedSystemPromptProvider` in `Main.k
   `DistributionProvider.kt`, `SudoProvider.kt`, …); pure parsers are extracted as `internal fun`s
   (e.g. `parseDistribution`, `formatSudoStatus`, `detectPackageManager`).
 - `Memory` — single compact line (`Memory: <total> total, <available> available`) from `free -h`
-  (falls back to the `free` column when `available` is absent). See `MemorySectionProvider.kt`.
-- `Root filesystem` — single compact line (`Root filesystem: <size>, <use%> used`) from `df -h /`.
-  See `RootFsSectionProvider.kt`.
-- `### CPU` — `lscpu` core count, with a `/proc/cpuinfo` fallback; emits `CPU(s): N` only
-  (model name and per-core details are dropped as non-actionable). See `CpuSectionProvider.kt`.
+  (falls back to the `free` column when `available` is absent). See `MemoryProvider.kt`.
+- `Root filesystem` — single compact line (`Root filesystem: <size>, <use%> used`) from `df -h /`. See
+  `RootFsProvider.kt`.
+- `### CPU` — `lscpu` core count, with a `/proc/cpuinfo` fallback; emits `CPU(s): N` only (model name and per-core
+  details are dropped as non-actionable). See `CpuProvider.kt`.
 - `### Current Directory` — `pwd` plus `ls -lA` listing (dotfiles included). See
   `CurrentDirectoryProvider.kt`.
+
+Layout convention: the `systemprompt` package holds only the `SystemPromptProvider` contract and the generic composing
+machinery (`ChainedSystemPromptProvider`, `safeProvide()`, `cmd()`, and `StaticSystemPromptProvider`). Every concrete
+provider lives under `systemprompt.providers`, nested to mirror the heading tree — root `##` sections sit directly in
+`providers/`, `## System Information` children under `providers/systeminformation/`, and the `### General` leaves under
+`providers/systeminformation/general/` — and each class is named after the section (or line) it renders.
 
 The config directory resolver is the shared `defaultConfigDir()` helper in `configuration/Configuration.kt` (
 `$HOME/.config/sara`, `.` fallback).
@@ -187,7 +193,7 @@ a change is made and deleted/updated when reverted, so the file always reflects 
 
 Implementation: `customizations/CustomizationSection.kt` (7-section enum), `customizations/Customizations.kt`
 (serializable model + render), `customizations/SystemCustomizationsStore.kt`,
-`tool/{Add,Remove,Replace}CustomizationTool.kt`, `systemprompt/SystemCustomizationsProvider.kt`.
+`tool/{Add,Remove,Replace}CustomizationTool.kt`, `systemprompt/providers/SystemCustomizationsProvider.kt`.
 
 ### CLI Interaction
 
@@ -248,7 +254,7 @@ Implementation: `Mode.kt` (enum with `label` and `instruction`), `ToolExecutor.a
 `WriteFileTool` (override), `ToolRegistry.getToolSchemas(filter)`, `Sara.kt` (mode state, prompt,
 `/plan`/`/exec` handling, tool filtering in `fetchLlmResponse`).
 
-The modes are also described statically in `SaraSystemPromptProvider` (a `## Modes` section in the
+The modes are also described statically in `InstructionsProvider` (a `## Modes` section in the
 base system prompt) so the agent always knows modes exist and can suggest `/plan` or `/exec`. The
 dynamic `Mode.instruction` injected on each switch is a pointed reminder of the *current* mode's
 constraints — for PLAN it enumerates forbidden `exec_command` actions explicitly.
@@ -287,7 +293,7 @@ information).
     `SARA_EXA_API_KEY` is set). **safe**.
   - `add_customization` / `remove_customization` / `replace_customization` — maintain the system customizations record
     (see System Customizations Log above) by section/ID. **safe** (no prompt), exec mode only.
-  - The persona (`SaraSystemPromptProvider`) explicitly encourages eager use of the available web
+  - `InstructionsProvider` explicitly encourages eager use of the available web
     tools for unfamiliar or version-specific topics, while skipping them for stable, well-known facts or when the local
     system already provides the answer, and prefers
     `exa_search`/`exa_contents` over `web_search` when they are available.
@@ -324,7 +330,7 @@ information).
 
 ### Sensitive Data Policy
 
-- `SensitiveDataPolicySystemPromptProvider` (a section of `SaraSystemPromptProvider`) injects a
+- `SensitiveDataPolicyProvider` (a section of `InstructionsProvider`) injects a
   "Sensitive data policy" section into the system prompt that forbids SARA from
   reading, displaying, printing, transmitting, or exfiltrating private/secret material under any circumstances.
 - Forbidden examples: `/etc/shadow`, SSH private keys, GPG private keys, cloud/SDK credentials.
@@ -350,7 +356,8 @@ When `SARA_EXA_API_KEY` is set, SARA registers two tools backed by the Exa Searc
   `...[truncated]` marker. Exa handles JavaScript-rendered pages, PDFs, and complex layouts.
 
 Both tools are `isSafe = true`. Implementation: `ExaClient` (ktor), `ExaSearchTool`, `ExaContentsTool`, with
-serialization covered by `ExaSerializationTest` and safe-ness asserted in `ToolExecutorIsSafeTest`. The persona prefers
+serialization covered by `ExaSerializationTest` and safe-ness asserted in `ToolExecutorIsSafeTest`. The
+`InstructionsProvider` prefers
 these tools over `web_search` when `SARA_EXA_API_KEY` is set. When Exa is enabled, `web_fetch` is **not**
 registered (its role is taken over by `exa_contents`); Searxng's `web_search` may still coexist with Exa.
 
