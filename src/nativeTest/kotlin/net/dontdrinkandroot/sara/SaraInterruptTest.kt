@@ -3,6 +3,8 @@ package net.dontdrinkandroot.sara
 import com.github.ajalt.mordant.terminal.Terminal
 import kotlinx.coroutines.*
 import net.dontdrinkandroot.sara.configuration.Configuration
+import net.dontdrinkandroot.sara.editor.LineInput
+import net.dontdrinkandroot.sara.editor.LineReadResult
 import net.dontdrinkandroot.sara.systemprompt.SystemPromptProvider
 import net.dontdrinkandroot.sara.tool.ToolExecutor
 import net.dontdrinkandroot.sara.tool.ToolRegistry
@@ -42,6 +44,65 @@ class SaraInterruptTest {
         inputReader = Sara.InputReader { inputs.removeAt(0) },
         sessionStore = FakeSessionStore(),
     )
+
+    /** Sara with a scripted [LineInput] that aborts when the queue yields an ABORT marker. */
+    private fun saraWithLineInput(
+        interruptSource: FakeInterruptSource,
+        llmClient: LlmClient,
+        script: MutableList<LineReadResult>,
+    ): Sara {
+        val lineInput = LineInput {
+            if (script.isEmpty()) LineReadResult.Eof else script.removeAt(0)
+        }
+        return Sara(
+            terminal = terminal,
+            configuration = configuration(),
+            logger = logger,
+            llmClient = llmClient,
+            toolRegistry = ToolRegistry(),
+            systemPromptProvider = object : SystemPromptProvider {
+                override fun provide() = ""
+            },
+            interruptSource = interruptSource,
+            lineInput = lineInput,
+            sessionStore = FakeSessionStore(),
+        )
+    }
+
+    @Test
+    fun interruptAtPromptAbortsInputAndReprompts() = runBlocking {
+        val interruptSource = FakeInterruptSource()
+        var callCount = 0
+        val llmClient = object : LlmClient {
+            override suspend fun chatCompletion(
+                model: String,
+                messages: List<Message>,
+                maxTokens: Int?,
+                temperature: Double?,
+                topP: Double?,
+                frequencyPenalty: Double?,
+                presencePenalty: Double?,
+                tools: List<Tool>?,
+                toolChoice: ToolChoice?
+            ): ChatCompletionResponse {
+                callCount++
+                return assistantResponse("Hello back!")
+            }
+
+            override fun close() {}
+        }
+
+        // First prompt: aborted by Ctrl+C. Second prompt: submitted normally.
+        val script = mutableListOf<LineReadResult>(
+            LineReadResult.Aborted,
+            LineReadResult.Submitted("hello"),
+        )
+        val sara = saraWithLineInput(interruptSource, llmClient, script)
+
+        withTimeout(5000) { sara.run() }
+
+        assertTrue(callCount == 1, "Turn should run once after the aborted prompt. Got $callCount")
+    }
 
     private fun assistantResponse(content: String): ChatCompletionResponse =
         ChatCompletionResponse(

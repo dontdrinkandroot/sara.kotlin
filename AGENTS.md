@@ -13,7 +13,7 @@
 * Remember that Clean Code implies using speaking variable and function names to avoid unnecessary comments.
 * As we are SOLID, we keep an eye on testability as it will indicate a good separation.
 * We love to use Kotlin sugar if the code remains readable or even helps it.
-* We use test-driven development by default, in small red→green→refactor cycles writing tests first. The tests are documenting our specification and expectations. If a test would be overly complicated, ask the user first if it is worth it.
+* We use test-driven development by default, in small red→green→refactor cycles writing tests first, checking if they fail as expected, then implementing. The tests are documenting our specification and expectations. If a test would be overly complicated, ask the user first if it is worth it.
 
 ## Environment
 
@@ -235,11 +235,20 @@ use `FakeSessionStore` (`nativeTest`). Covered by `FileSessionStoreTest` and `Sa
 
 ### CLI Interaction
 
-- Interactive REPL: reads user input from standard input (System.in).
+- Interactive REPL: the prompt reads input via a raw-mode line editor (see Prompt Line Editor
+  below), falling back to cooked `readlnOrNull()` when raw mode is unavailable (e.g. piped IO).
 - Session ends when the user submits an empty line or EOF (Ctrl+D) is encountered.
+- **Multiline input**: bracketed paste mode (`ESC[?2004h`) is enabled at startup, so pasting
+  multiline text submits it as ONE message (Mordant's POSIX parser reports the paste markers as
+  the `PasteStart`/`PasteEnd` keys; the editor inserts pasted characters verbatim and embedded
+  line breaks do NOT submit). **Alt+Enter** inserts a newline; a line ending in `\` continues on
+  the next line (the backslash is dropped).
 - **Ctrl+C (SIGINT) interrupts** the current turn (LLM request, tool execution, or permission prompt) and
-  returns to the prompt. A second Ctrl+C force-exits the process (safety net for stuck blocking calls).
-  At the prompt, Ctrl+C exits the program (same as Ctrl+D).
+  returns to the prompt. A second Ctrl+C force-exits the process (safety net for stuck blocking calls; the
+  signal handler force-exits when it fires while the flag is still pending, e.g. double Ctrl+C at the prompt).
+  At the prompt, raw mode reports Ctrl+C as a key event; SARA aborts the current input and re-raises
+  SIGINT via `kill(getpid(), SIGINT)` (`Main.raiseProcessInterrupt`) so the handler semantics stay intact;
+  the raised flag is consumed at the next turn start (`runTurnWithInterrupt`) and never exits the app on its own.
 - When a turn is interrupted, a system message (`"The user interrupted this turn. Stop and wait for the next user
   message."`) is appended to the conversation so the LLM reconciles the partial state. If the interrupt happens during
   tool-call processing, every unanswered tool call additionally receives a synthetic `tool` result
@@ -248,6 +257,39 @@ use `FakeSessionStore` (`nativeTest`). Covered by `FileSessionStoreTest` and `Sa
 - The SIGINT handler is installed via `SignalInterruptSource` (POSIX `signal()`). The `InterruptSource` interface
   is injected into `Sara` for testability (tests use `FakeInterruptSource`).
 - Verbose mode (-v/--verbose) prints a short REPL start hint.
+
+### Prompt Line Editor
+
+The REPL prompt is powered by the `editor` package, a small stack kept free of Mordant types so the
+editing semantics are unit-testable:
+
+- `EditEvent` / `EditResult` / `LineBuffer` / `LineEditor` — pure state machine: maps an edit event to
+  the next buffer or a terminal outcome (`Submit` / `Abort` / `Eof`). Enter submits, a trailing `\`
+  continues on the next line (backslash dropped), paste markers are no-ops on the buffer, and Ctrl+D
+  ends input on an empty buffer / deletes forward otherwise (bash convention).
+- `keyEventToEditEvent` (`MordantLineInput.kt`) — maps Mordant `KeyboardEvent`s (MDN key names:
+  `ArrowLeft`, `Home`, `Enter`, …) to edit events; unknown keys are skipped. Single-char `\n`/`\r`
+  keys insert newlines (they occur inside bracketed pastes).
+- `RenderTarget` / `PromptRenderer` / `MordantRenderTarget` — block renderer: redraws every row
+  of the (possibly multiline) buffer, erasing exactly the previously rendered rows, so
+  continuation lines leave no stale text; cursor positioning is logical (prefix width + column).
+  Row transitions to *new* rows use CR+LF (`moveToNextLine`) because cursor-down clamps at the
+  bottom screen margin instead of scrolling — at a bottom-of-window prompt the continuation row
+  would otherwise overwrite the current row; moves within the rendered block use plain cursor
+  movements.
+- `MordantLineInput` — the `LineInput` implementation: opens raw mode per read
+  (`enterRawModeOrNull` → `RawModeScopeReader`), renders the buffer with cursor positioning
+  (`startOfLine(); clearLine()` + cursor-left to the logical cursor), and translates Ctrl+C into an
+  `Abort` plus the injected `raiseInterrupt` hook.
+- `LineInput` / `LineReadResult` — the abstraction `Sara.promptUserInput` consumes
+  (`Submitted` / `Aborted` / `Eof`); `ScriptedLineInput` replays scripted lines for tests.
+- `BracketedPasteMode` — enables/disables `ESC[?2004h`/`ESC[?2004l` (idempotent); wired in `Main.kt`.
+- `PasteMarker.kt` — pure recognizer for the `ESC[200~`/`ESC[201~` byte sequences (kept for
+  potential cooked-mode paste detection; unused by the raw-mode path).
+
+There is NO command history (deliberate scope decision); logical rows never re-wrap: a logical
+line longer than the terminal width wraps visually and is edited as one row (cursor movement
+still operates on the logical buffer).
 
 ### Plan / Execution Mode
 

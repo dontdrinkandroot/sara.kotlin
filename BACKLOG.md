@@ -113,8 +113,6 @@ heading too. Origin: technical/domain review of 2026-07-20.
 
 ### UX
 
-- **Bare REPL input**: `readlnOrNull()` provides no line editing, no history, no
-  multi-line input. At minimum, persist a history file under `~/.config/sara/`.
 - **No test around the turn loop**: parsers and permission flow are tested, but the turn
   loop itself (dangling tool calls, error recovery) is exactly where the live bugs are.
   Add tests there.

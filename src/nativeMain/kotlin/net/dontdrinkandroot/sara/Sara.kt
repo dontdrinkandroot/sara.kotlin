@@ -15,6 +15,8 @@ import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import net.dontdrinkandroot.sara.configuration.Configuration
+import net.dontdrinkandroot.sara.editor.LineInput
+import net.dontdrinkandroot.sara.editor.LineReadResult
 import net.dontdrinkandroot.sara.logger.Logger
 import net.dontdrinkandroot.sara.session.FileSessionStore
 import net.dontdrinkandroot.sara.session.SessionLoad
@@ -40,6 +42,7 @@ class Sara(
     private val systemPromptProvider: SystemPromptProvider,
     private val interruptSource: InterruptSource = SignalInterruptSource,
     private val inputReader: InputReader = InputReader { readlnOrNull() },
+    private val lineInput: LineInput? = null,
     private val sessionStore: SessionStore,
 ) {
 
@@ -145,17 +148,39 @@ class Sara(
     }
 
     private fun promptUserInput(): String? {
-        terminal.println(cyan("User [${currentMode.label}]:"))
-        terminal.print("> ")
-        val input = inputReader.readLine()
+        while (true) {
+            terminal.println(cyan("User [${currentMode.label}]:"))
+            if (lineInput != null) {
+                return when (val result = lineInput.readSubmission()) {
+                    is LineReadResult.Submitted -> result.text
 
-        if (input.isNullOrBlank()) {
-            terminal.println()
-            terminal.println("Goodbye!")
-            return null
+                    LineReadResult.Eof -> {
+                        terminal.println()
+                        terminal.println("Goodbye!")
+                        null
+                    }
+
+                    LineReadResult.Aborted -> {
+                        // Ctrl+C: discard the current input and re-prompt. The raised
+                        // SIGINT flag is consumed at the next turn start, so it cannot
+                        // bleed into the following turn.
+                        terminal.println()
+                        continue
+                    }
+                }
+            }
+
+            terminal.print("> ")
+            val input = inputReader.readLine()
+
+            if (input.isNullOrBlank()) {
+                terminal.println()
+                terminal.println("Goodbye!")
+                return null
+            }
+
+            return input
         }
-
-        return input
     }
 
     /**

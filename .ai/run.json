@@ -22,5 +22,9 @@
     "gitShow": {
         "command": "git show {args}",
         "description": "Inspect a commit (git show)"
+    },
+    "nativeTest": {
+        "command": "./gradlew nativeTest --rerun-tasks",
+        "description": "Re-run all Kotlin/Native tests from scratch"
     }
 }
