@@ -76,6 +76,7 @@ class SaraModeTest {
         },
         interruptSource = interruptSource,
         inputReader = Sara.InputReader { inputs.removeAt(0) },
+        sessionStore = FakeSessionStore(),
     )
 
     @Test

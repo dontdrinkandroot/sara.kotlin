@@ -7,6 +7,7 @@ import net.dontdrinkandroot.sara.configuration.loadConfiguration
 import net.dontdrinkandroot.sara.customizations.SystemCustomizationsStore
 import net.dontdrinkandroot.sara.logger.ConsoleLogger
 import net.dontdrinkandroot.sara.logger.LogLevel
+import net.dontdrinkandroot.sara.session.FileSessionStore
 import net.dontdrinkandroot.sara.systemprompt.ChainedSystemPromptProvider
 import net.dontdrinkandroot.sara.systemprompt.StaticSystemPromptProvider
 import net.dontdrinkandroot.sara.systemprompt.providers.InstructionsProvider
@@ -90,6 +91,7 @@ fun main(args: Array<String>) {
         llmClient = llmClient,
         toolRegistry = toolRegistry,
         systemPromptProvider = systemPromptProvider,
+        sessionStore = FileSessionStore(),
     )
     try {
         runBlocking {

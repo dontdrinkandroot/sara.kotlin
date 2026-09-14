@@ -141,8 +141,10 @@ heading too. Origin: technical/domain review of 2026-07-20.
   spinner is currently a workaround for this.
 - **Context compaction**: summarize or truncate old turns when approaching the model's
   context limit.
-- **Session persistence**: save/load conversations (`/save <name>`, `sara --resume`),
-  stored under `~/.config/sara/sessions/`.
+- **Named sessions / `--resume` picker**: the previous session is now auto-persisted and
+  offered for restore at startup (see Session persistence & restore). Still missing: named
+  sessions (`/save <name>`, `sara --resume <name>`) with a picker among several stored
+  sessions under `~/.config/sara/sessions/`.
 - **More native tools**: `list_directory`, `grep`/`search_files`, `glob` — reduces
   `exec_command` usage and improves safety, matching the "prefer native tools" rule in the instructions.
 - **Technical enforcement of the sensitive-data policy**: path blocklist in `read_file`,

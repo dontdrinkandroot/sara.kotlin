@@ -13,6 +13,7 @@
 * Remember that Clean Code implies using speaking variable and function names to avoid unnecessary comments.
 * As we are SOLID, we keep an eye on testability as it will indicate a good separation.
 * We love to use Kotlin sugar if the code remains readable or even helps it.
+* We use test-driven development by default, in small red→green→refactor cycles writing tests first. The tests are documenting our specification and expectations. If a test would be overly complicated, ask the user first if it is worth it.
 
 ## Environment
 
@@ -23,6 +24,9 @@
     `SARA_SEARXNG_TOKEN` for Searxng web search (see Web Search below), and `SARA_EXA_API_KEY` for the Exa web search &
     contents tools (see Exa Web Search & Contents below).
     * There is an optional `system-prompt.md` file that contains a System Prompt which is prepended to each session.
+    * The current session is persisted to `session.json` (continuously, survives clean exits) and offered for restore
+      at the next startup (see Session persistence & restore below); `session.json.bak` holds a quarantined corrupt
+      session file.
 
 ## Build
 
@@ -202,6 +206,32 @@ a change is made and deleted/updated when reverted, so the file always reflects 
 Implementation: `customizations/CustomizationSection.kt` (7-section enum), `customizations/Customizations.kt`
 (serializable model + render), `customizations/SystemCustomizationsStore.kt`,
 `tool/{Add,Remove,Replace}CustomizationTool.kt`, `systemprompt/providers/SystemCustomizationsProvider.kt`.
+
+### Session persistence & restore
+
+The current session is continuously persisted to `~/.config/sara/session.json` so an interrupted, crashed, or rebooted
+session can be continued at the next startup.
+
+- File layout: pretty-printed JSON with `version` (currently 1), `savedAt` (ISO 8601 via `date -Is`), `mode`
+  (`exec`/`plan`), and `messages` — the **verbatim** conversation (`Message` is already `@Serializable`), including
+  system messages, assistant messages with `tool_calls`, and all `tool` results.
+- The file is rewritten after **every** conversation mutation (user message, assistant message, each tool result,
+  denial/interrupt synthetic results, mode switch, interrupt system message) via `Sara.persistSession`. It **survives
+  clean exits**, so every startup that finds one offers to continue it.
+- Startup: if a saved session exists, SARA prints `Found a previous session (last activity <savedAt>)` and asks
+  `Continue previous session? [y/N]` — **Enter/N starts a new session** (the file is deleted immediately; it reappears
+  with the first save of the new session). `y`/`yes` restores the saved state **verbatim**: the fresh system message is
+  replaced by the saved message list and `currentMode` is taken from the file (no duplicate mode-switch system message
+  is injected).
+- A **corrupt** file is renamed to `session.json.bak` (preserved for manual inspection, overwriting a previous backup)
+  and reported with a yellow warning; the session then starts fresh.
+- Failures while saving are logged but never break the running turn.
+
+Implementation: `session/SavedSession.kt` (serializable model + `savedModeOrDefault` fallback for unknown mode names),
+`session/SessionStore.kt` (interface with sealed `SessionLoad` result: `NoSession` / `Found` / `Corrupt`),
+`session/FileSessionStore.kt` (file-backed implementation). The store is a **required** constructor dependency of
+`Sara` (no hidden default that would touch the real config dir in tests); `Main.kt` wires `FileSessionStore()`, tests
+use `FakeSessionStore` (`nativeTest`). Covered by `FileSessionStoreTest` and `SaraSessionTest`.
 
 ### CLI Interaction
 

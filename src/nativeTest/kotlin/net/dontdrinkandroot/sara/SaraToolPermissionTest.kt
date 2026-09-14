@@ -34,6 +34,7 @@ class SaraToolPermissionTest {
                 override fun provide() = ""
             },
             inputReader = inputReader,
+            sessionStore = FakeSessionStore(),
         )
     }
 

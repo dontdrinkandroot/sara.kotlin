@@ -40,6 +40,7 @@ class SaraInterruptTest {
         },
         interruptSource = interruptSource,
         inputReader = Sara.InputReader { inputs.removeAt(0) },
+        sessionStore = FakeSessionStore(),
     )
 
     private fun assistantResponse(content: String): ChatCompletionResponse =
@@ -334,6 +335,7 @@ class SaraInterruptTest {
                 if (line == "y") interruptSource.trigger()
                 line
             },
+            sessionStore = FakeSessionStore(),
         )
 
         val saraJob = launch { sara.run() }

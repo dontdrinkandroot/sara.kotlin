@@ -16,6 +16,10 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import net.dontdrinkandroot.sara.configuration.Configuration
 import net.dontdrinkandroot.sara.logger.Logger
+import net.dontdrinkandroot.sara.session.FileSessionStore
+import net.dontdrinkandroot.sara.session.SessionLoad
+import net.dontdrinkandroot.sara.session.SessionStore
+import net.dontdrinkandroot.sara.session.savedModeOrDefault
 import net.dontdrinkandroot.sara.systemprompt.SystemPromptProvider
 import net.dontdrinkandroot.sara.tool.ToolExecutor
 import net.dontdrinkandroot.sara.tool.ToolRegistry
@@ -36,6 +40,7 @@ class Sara(
     private val systemPromptProvider: SystemPromptProvider,
     private val interruptSource: InterruptSource = SignalInterruptSource,
     private val inputReader: InputReader = InputReader { readlnOrNull() },
+    private val sessionStore: SessionStore,
 ) {
 
     private var currentMode: Mode = Mode.EXEC
@@ -59,9 +64,48 @@ class Sara(
         logger.debug("System prompt: $systemPrompt")
         val messages = mutableListOf(Message(role = "system", content = systemPrompt))
 
+        restoreOrDiscardSavedSession(messages)
+
         logger.debug("REPL started. Submit empty line or EOF (Ctrl+D) to exit.")
 
         runConversationLoop(messages)
+    }
+
+    /**
+     * Handles the persisted session at startup: on [SessionLoad.Found] offers to continue
+     * (restore verbatim) or start fresh (delete the file); [SessionLoad.Corrupt] warns that
+     * the file was moved aside to the `.bak` backup and starts fresh;
+     * [SessionLoad.NoSession] does nothing.
+     */
+    internal fun restoreOrDiscardSavedSession(messages: MutableList<Message>) {
+        when (val load = sessionStore.load()) {
+            SessionLoad.NoSession -> return
+
+            SessionLoad.Corrupt -> {
+                terminal.println(yellow("[sara] Saved session file was corrupt; moved to ${FileSessionStore.BACKUP_FILE_NAME}. Starting a new session."))
+            }
+
+            is SessionLoad.Found -> {
+                terminal.println("Found a previous session (last activity ${load.saved.savedAt}).")
+                terminal.print("Continue previous session? [y/N]: ")
+                val answer = inputReader.readLine()
+
+                if (interruptSource.consumeInterrupt()) return
+
+                terminal.println()
+
+                if (answer?.trim()?.lowercase() !in setOf("y", "yes")) {
+                    sessionStore.delete()
+                    terminal.println("[sara] Starting a new session.")
+                    return
+                }
+
+                messages.clear()
+                messages.addAll(load.saved.messages)
+                currentMode = savedModeOrDefault(load.saved.mode)
+                terminal.println("[sara] Restored previous session (${load.saved.messages.size} messages, mode: ${currentMode.label}).")
+            }
+        }
     }
 
     private suspend fun runConversationLoop(messages: MutableList<Message>) {
@@ -75,6 +119,7 @@ class Sara(
                         terminal.println("[sara] Switched to plan mode.")
                         println()
                         messages.add(Message(role = "system", content = Mode.PLAN.instruction))
+                        persistSession(messages)
                     }
                     continue
                 }
@@ -85,12 +130,14 @@ class Sara(
                         terminal.println("[sara] Switched to execution mode.")
                         println()
                         messages.add(Message(role = "system", content = Mode.EXEC.instruction))
+                        persistSession(messages)
                     }
                     continue
                 }
             }
 
             messages.add(Message(role = "user", content = userInput))
+            persistSession(messages)
             println()
 
             runTurnWithInterrupt(messages)
@@ -146,6 +193,7 @@ class Sara(
                     content = "The user interrupted this turn. Stop and wait for the next user message."
                 )
             )
+            persistSession(messages)
         }
     }
 
@@ -223,6 +271,7 @@ class Sara(
         val toolCalls = message.toolCalls!!
         logger.debug("Model requested ${toolCalls.size} tool call(s)")
         messages.add(message)
+        persistSession(messages)
 
         val answeredToolCallIds = mutableSetOf<String>()
         try {
@@ -243,6 +292,7 @@ class Sara(
                             messages
                         )
                     }
+                persistSession(messages)
             }
             throw e
         }
@@ -269,6 +319,7 @@ class Sara(
             is PermissionResult.Denied -> {
                 val denialMessage = buildDenialMessage(permission.reason)
                 addToolErrorMessage(toolCall, toolName, denialMessage, messages)
+                persistSession(messages)
                 logger.warn("Tool execution denied by user" + (permission.reason?.takeIf { it.isNotBlank() }
                     ?.let { ": $it" } ?: ""))
                 return
@@ -280,6 +331,7 @@ class Sara(
 
         val result = executeToolWithErrorHandling(tool, toolArgs)
         addToolResultMessage(toolCall, toolName, result, messages)
+        persistSession(messages)
         logToolResult(result)
     }
 
@@ -376,8 +428,23 @@ class Sara(
             terminal.println(Markdown(content))
             println()
             messages.add(message)
+            persistSession(messages)
         } else {
             logger.error("No content returned by the model.")
+        }
+    }
+
+    /**
+     * Writes the current conversation state to the [SessionStore] after every conversation
+     * mutation (user message, assistant message, tool result, mode switch, interrupt note),
+     * so a crash or reboot never loses more than the change in flight. The file survives
+     * clean exits and is offered for restore at the next startup.
+     */
+    private fun persistSession(messages: List<Message>) {
+        try {
+            sessionStore.save(messages, currentMode)
+        } catch (e: Exception) {
+            logger.error("Failed to persist session: ${e.message}")
         }
     }
 
