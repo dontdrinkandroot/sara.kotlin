@@ -2,4 +2,4 @@ build
 /.idea/
 /.gradle/
 docs/
-/.ai/
+/.ai/mcp/mcp.json

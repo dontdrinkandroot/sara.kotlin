@@ -26,5 +26,17 @@
     "nativeTest": {
         "command": "./gradlew nativeTest --rerun-tasks",
         "description": "Re-run all Kotlin/Native tests from scratch"
+    },
+    "sdk_sources": {
+        "command": "bash .ai/scripts/sdk-sources.sh {args}",
+        "description": "Extract a *-sources.jar from the Gradle cache to /tmp/acp-sdk-sources for inspection (args: coordinate substring [version])"
+    },
+    "gitStatus": {
+        "command": "git status --short --branch {args}",
+        "description": "Show compact status with branch info (optional args: pathspec)"
+    },
+    "gitDiff": {
+        "command": "git diff {args}",
+        "description": "Show diff (optional args: e.g. HEAD, HEAD~1..HEAD, or pathspec)"
     }
 }
