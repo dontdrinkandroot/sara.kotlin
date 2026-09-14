@@ -1,0 +1,18 @@
+{
+    "dependencyUpdates": {
+        "command": "./gradlew dependencyUpdates",
+        "description": "Check for available dependency and Gradle updates"
+    },
+    "build": {
+        "command": "./gradlew build",
+        "description": "Build the project and run all tests"
+    },
+    "gradleWrapper": {
+        "command": "./gradlew wrapper --gradle-version {args}",
+        "description": "Update the Gradle wrapper to a given version"
+    },
+    "gitCommit": {
+        "command": "git commit {args}",
+        "description": "Create a semantic commit (e.g. \"feat: add X\"); never push"
+    }
+}

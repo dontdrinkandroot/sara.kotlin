@@ -2,10 +2,10 @@
 
 * This is the codebase of SARA (System Action & Response Agent), an LLM Agent Interface for the CLI that helps the user
   use their Linux/Unix operating system.
-* It is written in Kotlin/Native 2.4.0
-* It uses ktor 3.5.1 to handle the API requests against an OpenAI compatible API
+* It is written in Kotlin/Native 2.4.20
+* It uses ktor 3.5.2 to handle the API requests against an OpenAI compatible API
 * It uses ksoup 0.2.6 (fleeksoft) for HTML parsing in the `web_fetch` tool
-* It uses mordant 3.0.2 for styling the output and formatting the Markdown output
+* It uses mordant 3.1.0 for styling the output and formatting the Markdown output
 
 ## Coding Rules
 
@@ -28,6 +28,14 @@
 
 * The result is a binary called `sara.kexe` that can be built with `gradle build`.
 * We always run `gradle build` after performing a task to see if the build succeeds and the tests are green.
+* The `io.github.ben-manes.versions` Gradle plugin (0.62.0) provides the `gradle dependencyUpdates` task that reports
+  outdated dependencies and Gradle releases; there is a matching `dependencyUpdates` run configuration.
+
+## Git
+
+* There is a `gitCommit` run configuration (`git commit {args}`) for creating commits; commit messages follow
+  [Conventional Commits](https://www.conventionalcommits.org/) (e.g. `feat: add X`, `fix: handle Y`, `chore: bump deps`).
+* Commit **only if the user explicitly requests it**, and **never push**.
 
 ## Testing
 
@@ -271,7 +279,7 @@ information).
 
 ### Markdown Rendering
 
-- LLM responses are rendered as Markdown in the terminal using Mordant 3.0.2.
+- LLM responses are rendered as Markdown in the terminal using Mordant 3.1.0.
 
 ### Tool Calling Support
 
