@@ -63,7 +63,9 @@ class OpenRouterSerializationTest {
         assertNotNull(funcDesc)
         assertEquals("exec_command", funcDesc["name"]?.jsonPrimitive?.content)
         assertEquals(
-            "Execute a system command (including its arguments) and return its output",
+            "Execute a system command (including its arguments) and return its output and exit " +
+                "status; oversized output is truncated to head/tail excerpts with the full log " +
+                "spilled to a temporary file",
             funcDesc["description"]?.jsonPrimitive?.content
         )
         assertNotNull(funcDesc["parameters"])

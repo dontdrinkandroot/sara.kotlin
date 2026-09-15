@@ -28,16 +28,6 @@ heading too. Origin: technical/domain review of 2026-07-20.
   penalties and `toolChoice` are plumbed through but never set from anywhere. Either wire
   them to configuration (env/CLI) or remove them.
 
-### exec_command
-
-- **Exit code swallowed** (`executeCommand`, `ExecuteCommand.kt`): the return value of
-  `pclose` is ignored, so a failing command with no output reports "Command executed
-  successfully with no output" — actively misleading the LLM. Capture the exit status and
-  include it in the result.
-- **Unbounded output**: unlike `web_fetch` and `read_file`, there is no truncation. A
-  command like `cat hugefile` or `find /` explodes the context window and the API bill.
-  Truncate with a continuation marker, consistent with the other tools.
-
 ### Security
 
 - **Plan mode bypassable at execution time** (`Sara.executeToolCall`): `write_file` is

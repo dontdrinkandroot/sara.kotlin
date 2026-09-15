@@ -38,5 +38,9 @@
     "gitDiff": {
         "command": "git diff {args}",
         "description": "Show diff (optional args: e.g. HEAD, HEAD~1..HEAD, or pathspec)"
+    },
+    "gradleStop": {
+        "command": "./gradlew --stop; pkill -f GradleDaemon || true; sleep 2",
+        "description": "Stop Gradle daemons and kill any lingering daemon processes holding cache locks"
     }
 }

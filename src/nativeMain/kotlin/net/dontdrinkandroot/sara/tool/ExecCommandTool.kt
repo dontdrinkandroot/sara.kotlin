@@ -10,7 +10,10 @@ import net.dontdrinkandroot.sara.FunctionDescription
  */
 class ExecCommandTool : ToolExecutor {
     override val name: String = "exec_command"
-    override val description: String = "Execute a system command (including its arguments) and return its output"
+    override val description: String =
+        "Execute a system command (including its arguments) and return its output and exit " +
+            "status; oversized output is truncated to head/tail excerpts with the full log " +
+            "spilled to a temporary file"
 
     override fun getFunctionDescription(): FunctionDescription {
         return FunctionDescription(
@@ -40,13 +43,21 @@ class ExecCommandTool : ToolExecutor {
                 println("[sara] Executing command: $command")
             }
 
-            val output = executeCommand(command)
+            val execution = executeCommandWithStatus(command)
+            val truncation = truncateHeadTail(execution.output)
 
             if (verbose) {
-                println("[sara] Command completed with ${output.length} characters of output")
+                println(
+                    "[sara] Command completed: ${statusLine(execution.exitStatus)}, " +
+                        "${execution.output.length} characters of output"
+                )
             }
 
-            return ToolResult.Success(output.ifEmpty { "Command executed successfully with no output" })
+            return ToolResult.CommandResult(
+                output = execution.output,
+                exitStatus = execution.exitStatus,
+                truncation = truncation,
+            )
 
         } catch (e: Exception) {
             return ToolResult.Error("Failed to execute command: ${e.message}")

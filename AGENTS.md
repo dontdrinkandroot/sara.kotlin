@@ -356,7 +356,10 @@ information).
 ### Tool Calling Support
 
 - The assistant can request tools; SARA exposes the following tools:
-  - `exec_command` — run a local shell command (combined stdout/stderr). **unsafe** (always prompts).
+  - `exec_command` — run a local shell command (combined stdout/stderr). Returns the output
+    (truncated to head/tail excerpts when oversized) plus its terminal status
+    (`[exit code: N]` or `[killed by signal: SIGX]`). **unsafe** (always prompts). See
+    `exec_command` result format below.
   - `read_file` — read a file by path. **safe** (no prompt). Guarded by the sensitive-data policy in the system prompt.
     Optional arguments: `offset` (0-based character offset to start at, default 0) and `limit` (max characters to
     read, default 10000) to keep large files from polluting the context window. When the file has more content
@@ -407,6 +410,36 @@ information).
   and finally `progress.clear()` removes the frame, uninstalls the interceptor, and restores the
   cursor. Never bypass Mordant with a manual `terminal.cursor.move { ... }` clear: that leaves the
   interceptor in place and causes the spinner to be re-drawn on every subsequent print.
+
+### exec_command Result Format
+
+The `exec_command` tool reports the command's terminal status on every result — the LLM no
+longer has to guess whether an empty output meant success.
+
+- `ExecuteCommand.kt` captures the `pclose` wait status and decodes it via
+  `decodeWaitStatus` into an `ExitStatus` (`code` XOR `signal`; core-dump bit ignored,
+  signal names from a static 1–31 map). `executeCommand()`/`executeCommandSafe()` keep
+  their old signatures (10+ callers) and wrap the new `executeCommandWithStatus()`.
+- The result is a `ToolResult.CommandResult(output, exitStatus, truncation)`; its
+  `toContentString()` renders via `renderExecResult`:
+
+  ```
+  <output or (no output) placeholder>
+
+  [exit code: 0]           # or [killed by signal: SIGSEGV]
+  ```
+
+- Oversized output (>20000 chars) is truncated to head+tail excerpts of ≤10000 chars each,
+  snapped to line boundaries when a newline falls within the excerpt window (kept raw
+  otherwise, so excerpts never exceed the limits). The full output is spilled to a
+  `mkstemp`-created `/tmp/sara-exec-XXXXXX.log` (mode 0600); SARA never deletes spill files
+  (the /tmp lifecycle handles them). The inline marker
+  `...[N characters omitted — full log: /tmp/sara-exec-…; use read_file to inspect]...`
+  plus a trailing `[output truncated: …]` footer point the agent to the spill file.
+- Implementation: `ExecOutputFormatting.kt` (pure, fully unit-tested:
+  `ExecOutputFormattingTest`) and `ExecCommandTool.kt` (I/O, covered by
+  `ExecCommandToolTest` including exit code, signal death, placeholder, and spill-file
+  round-trip). Test support: `SpillFileTestSupport.kt` (nativeTest).
 
 ### Sensitive Data Policy
 
