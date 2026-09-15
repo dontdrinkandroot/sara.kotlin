@@ -24,7 +24,7 @@
         "description": "Extract a *-sources.jar from the Gradle cache to /tmp/acp-sdk-sources for inspection (args: coordinate substring [version])"
     },
     "gitCommit": {
-        "command": "git commit {args}",
+        "command": "git commit -m {args}",
         "description": "Create a semantic commit (e.g. \"feat: add X\"); never push"
     },
     "gitAdd": {
