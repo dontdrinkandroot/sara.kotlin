@@ -11,6 +11,18 @@
         "command": "./gradlew wrapper --gradle-version {args}",
         "description": "Update the Gradle wrapper to a given version"
     },
+    "nativeTest": {
+        "command": "./gradlew nativeTest --rerun-tasks",
+        "description": "Re-run all Kotlin/Native tests from scratch"
+    },
+    "nativeTestFiltered": {
+        "command": "./gradlew nativeTest --rerun-tasks --tests {args}",
+        "description": "Run filtered Kotlin/Native tests (args: --tests pattern)"
+    },
+    "sdk_sources": {
+        "command": "bash .ai/scripts/sdk-sources.sh {args}",
+        "description": "Extract a *-sources.jar from the Gradle cache to /tmp/acp-sdk-sources for inspection (args: coordinate substring [version])"
+    },
     "gitCommit": {
         "command": "git commit {args}",
         "description": "Create a semantic commit (e.g. \"feat: add X\"); never push"
@@ -22,14 +34,6 @@
     "gitShow": {
         "command": "git show {args}",
         "description": "Inspect a commit (git show)"
-    },
-    "nativeTest": {
-        "command": "./gradlew nativeTest --rerun-tasks",
-        "description": "Re-run all Kotlin/Native tests from scratch"
-    },
-    "sdk_sources": {
-        "command": "bash .ai/scripts/sdk-sources.sh {args}",
-        "description": "Extract a *-sources.jar from the Gradle cache to /tmp/acp-sdk-sources for inspection (args: coordinate substring [version])"
     },
     "gitStatus": {
         "command": "git status --short --branch {args}",

@@ -420,6 +420,13 @@ longer has to guess whether an empty output meant success.
   `decodeWaitStatus` into an `ExitStatus` (`code` XOR `signal`; core-dump bit ignored,
   signal names from a static 1–31 map). `executeCommand()`/`executeCommandSafe()` keep
   their old signatures (10+ callers) and wrap the new `executeCommandWithStatus()`.
+- stderr of **every** command in a compound command list (`a; b`, `a && b`, `a | b`) is
+  captured: `popen` runs `sh -c "exec 2>&1; <command>"` — the shell redirects its own fd 2
+  into the pipe *before* running the list. Do NOT revert to the naive `"<command> 2>&1"`:
+  a redirection suffix binds only to the last simple command of a list, so stderr of all
+  earlier commands would leak to SARA's terminal (regression covered by
+  `ExecCommandToolTest`; the subshell alternative `( <command> ) 2>&1` is worse — it
+  breaks on empty commands and trailing comments).
 - The result is a `ToolResult.CommandResult(output, exitStatus, truncation)`; its
   `toContentString()` renders via `renderExecResult`:
 

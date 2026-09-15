@@ -89,6 +89,35 @@ class ExecCommandToolTest {
     }
 
     @Test
+    fun testExecuteCapturesStderrOfEveryCommandInAList() {
+        val result = execute("echo out; sh -c 'echo err >&2'; echo done")
+        assertTrue(result.output.contains("out"))
+        assertTrue(result.output.contains("err"))
+        assertTrue(result.output.contains("done"))
+    }
+
+    @Test
+    fun testExecuteCapturesStderrOfPipelineProducer() {
+        val result = execute("sh -c 'echo pipe-err >&2'; echo pipe | cat")
+        assertTrue(result.output.contains("pipe-err"))
+        assertTrue(result.output.contains("pipe"))
+    }
+
+    @Test
+    fun testExecuteEmptyCommandReportsSuccess() {
+        val result = execute("")
+        assertEquals(0, result.exitStatus.code)
+        assertEquals("", result.output)
+    }
+
+    @Test
+    fun testExecuteTrailingCommentIsIgnored() {
+        val result = execute("echo out # trailing comment")
+        assertEquals(0, result.exitStatus.code)
+        assertTrue(result.output.contains("out"))
+    }
+
+    @Test
     fun testExecuteTruncatesLargeOutputWithSpillFile() {
         val result = execute("yes '0123456789012345678901234567890123456789' | head -c 25000")
         val truncation = result.truncation
