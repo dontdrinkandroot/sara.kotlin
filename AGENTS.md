@@ -456,6 +456,10 @@ longer has to guess whether an empty output meant success.
 - Forbidden examples: `/etc/shadow`, SSH private keys, GPG private keys, cloud/SDK credentials.
 - This is the soft guardrail that complements `read_file` being marked `isSafe = true` (executed without confirmation).
 - The policy applies to `read_file`, `exec_command`, and `web_fetch` alike.
+- **Accidental exposure must be reported**: if SARA accidentally reads or otherwise accesses secret
+  material, it must immediately disclose this to the user — which file/command was involved, what data
+  may have been exposed, and that the affected credentials must be treated as compromised and rotated.
+  It must never hide or downplay the incident, and never repeat the exposed secret itself.
 
 ### Web Search (Searxng)
 
